@@ -313,7 +313,11 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            if (field.Type == FieldType.Choice)
+            if (field.Type == FieldType.Date)
+            {
+                e.Column = CreateDateColumn(field);
+            }
+            else if (field.Type == FieldType.Choice)
             {
                 e.Column = CreateChoiceColumn(field);
             }
@@ -821,12 +825,67 @@ namespace Tournaments.WPF.Views
             column.CellStyle = style;
         }
 
+        private DataGridColumn CreateDateColumn(FieldDefinition field)
+        {
+            return new DataGridTemplateColumn
+            {
+                CellTemplate = CreateDateCellTemplate(field),
+                CellEditingTemplate = CreateDateEditingTemplate(field),
+                SortMemberPath = field.Name
+            };
+        }
+
+        private DataTemplate CreateDateCellTemplate(FieldDefinition field)
+        {
+            FrameworkElementFactory textBlock = new FrameworkElementFactory(typeof(TextBlock));
+            textBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            textBlock.SetValue(TextBlock.MarginProperty, new Thickness(4, 0, 4, 0));
+            textBlock.SetBinding(TextBlock.TextProperty, new Binding(field.Name)
+            {
+                Converter = _dbNullValueConverter,
+                ConverterParameter = field.Type,
+                StringFormat = "dd.MM.yyyy",
+                TargetNullValue = string.Empty
+            });
+
+            return new DataTemplate
+            {
+                VisualTree = textBlock
+            };
+        }
+
+        private DataTemplate CreateDateEditingTemplate(FieldDefinition field)
+        {
+            FrameworkElementFactory datePicker = new FrameworkElementFactory(typeof(DatePicker));
+            datePicker.SetValue(DatePicker.SelectedDateFormatProperty, DatePickerFormat.Short);
+            datePicker.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            datePicker.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch);
+            datePicker.SetBinding(DatePicker.SelectedDateProperty, CreateDateEditableBinding(field));
+
+            return new DataTemplate
+            {
+                VisualTree = datePicker
+            };
+        }
+
+        private Binding CreateDateEditableBinding(FieldDefinition field)
+        {
+            return new Binding(field.Name)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+                Converter = _dbNullValueConverter,
+                ConverterParameter = field.Type,
+                ValidatesOnExceptions = true,
+                NotifyOnValidationError = true
+            };
+        }
         private DataGridColumn CreateChoiceColumn(FieldDefinition field)
         {
             return new DataGridComboBoxColumn
             {
                 ItemsSource = field.AllowedValues.ToList(),
-                SelectedItemBinding = CreateEditableBinding(field),
+                SelectedItemBinding = CreateSelectorBinding(field),
                 SortMemberPath = field.Name
             };
         }
@@ -839,7 +898,7 @@ namespace Tournaments.WPF.Views
                 ItemsSource = options,
                 DisplayMemberPath = nameof(LookupOption.Display),
                 SelectedValuePath = nameof(LookupOption.Value),
-                SelectedValueBinding = CreateEditableBinding(field),
+                SelectedValueBinding = CreateSelectorBinding(field),
                 SortMemberPath = field.Name
             };
         }
@@ -853,6 +912,21 @@ namespace Tournaments.WPF.Views
                 Converter = _dbNullValueConverter,
                 ConverterParameter = field.Type,
                 TargetNullValue = string.Empty,
+                ValidatesOnExceptions = true,
+                NotifyOnValidationError = true
+            };
+        }
+
+        private Binding CreateSelectorBinding(FieldDefinition field)
+        {
+            return new Binding(field.Name)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+                Converter = _dbNullValueConverter,
+                ConverterParameter = field.Type,
+                TargetNullValue = null,
+                FallbackValue = null,
                 ValidatesOnExceptions = true,
                 NotifyOnValidationError = true
             };
@@ -1012,5 +1086,7 @@ namespace Tournaments.WPF.Views
         }
     }
 }
+
+
 
 
