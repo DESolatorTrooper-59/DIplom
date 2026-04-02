@@ -456,8 +456,8 @@ namespace Tournaments.WPF.Views
             GridItems.UpdateLayout();
             GridItems.SelectedItem = rowView;
 
-            DataGridColumn editableColumn = GridItems.Columns.FirstOrDefault(column => CanEditColumn(column, isInsertMode));
-            if (editableColumn == null)
+            List<DataGridColumn> editableColumns = GetEditableColumnsInPreferredOrder(isInsertMode).ToList();
+            if (editableColumns.Count == 0)
             {
                 if (!isInsertMode)
                 {
@@ -469,14 +469,15 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            GridItems.ScrollIntoView(rowView, editableColumn);
-            GridItems.CurrentCell = new DataGridCellInfo(rowView, editableColumn);
-            GridItems.Focus();
-
-            if (!GridItems.BeginEdit())
+            foreach (DataGridColumn editableColumn in editableColumns)
             {
-                throw new InvalidOperationException("Не удалось перевести строку в режим редактирования.");
+                if (TryBeginEditCell(rowView, editableColumn))
+                {
+                    return;
+                }
             }
+
+            throw new InvalidOperationException("Не удалось перевести строку в режим редактирования.");
         }
 
         private void CompletePendingChangeIfAny()
@@ -1005,6 +1006,42 @@ namespace Tournaments.WPF.Views
 
             return valueText + " - " + displayText;
         }
+        private IEnumerable<DataGridColumn> GetEditableColumnsInPreferredOrder(bool isInsertMode)
+        {
+            return GridItems.Columns
+                .Where(column => CanEditColumn(column, isInsertMode))
+                .OrderBy(GetColumnFieldOrder)
+                .ThenBy(column => column.DisplayIndex);
+        }
+
+        private int GetColumnFieldOrder(DataGridColumn column)
+        {
+            FieldDefinition field = GetFieldForColumn(column);
+            if (field == null)
+            {
+                return int.MaxValue;
+            }
+
+            for (int index = 0; index < _definition.Fields.Count; index++)
+            {
+                if (string.Equals(_definition.Fields[index].Name, field.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return index;
+                }
+            }
+
+            return int.MaxValue;
+        }
+
+        private bool TryBeginEditCell(DataRowView rowView, DataGridColumn editableColumn)
+        {
+            GridItems.ScrollIntoView(rowView, editableColumn);
+            GridItems.CurrentCell = new DataGridCellInfo(rowView, editableColumn);
+            GridItems.Focus();
+            GridItems.UpdateLayout();
+            return GridItems.BeginEdit();
+        }
+
         private bool CanEditColumn(DataGridColumn column, bool isInsertMode)
         {
             FieldDefinition field = GetFieldForColumn(column);
@@ -1086,6 +1123,7 @@ namespace Tournaments.WPF.Views
         }
     }
 }
+
 
 
 
