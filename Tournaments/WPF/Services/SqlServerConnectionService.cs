@@ -52,6 +52,12 @@ namespace Tournaments.WPF.Services
             ActiveConnectionLabel = settings.Database + " @ " + settings.Server;
         }
 
+        public void ClearSuccessfulConnection()
+        {
+            ActiveConnectionString = null;
+            ActiveConnectionLabel = null;
+        }
+
         private static SqlServerConnectionSettings ReadFromConfiguration()
         {
             ConnectionStringSettings configured = ConfigurationManager.ConnectionStrings["BdCon"];
