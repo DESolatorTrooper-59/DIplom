@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Tournaments.WPF.Models;
 
 namespace Tournaments.WPF.Services
@@ -7,22 +8,27 @@ namespace Tournaments.WPF.Services
     {
         private static EntityDefinition CreateTournamentsDefinition()
         {
+            FieldDefinition participantMode = new FieldDefinition("ParticipantMode", "Тип участников", FieldType.Choice) { IsRequired = true };
+            participantMode.AllowedValues.Add("Команды");
+            participantMode.AllowedValues.Add("Игроки");
+
             EntityDefinition definition = new EntityDefinition(
                 "Tournaments",
                 "Турниры",
                 new[] { "TournamentID" },
-                new[]
+                new FieldDefinition[]
                 {
                     new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
                     new FieldDefinition("TournamentName", "Название турнира", FieldType.Text) { IsRequired = true },
-                    new FieldDefinition("GameID", "ID игры", FieldType.Integer) { IsRequired = true },
+                    CreateLookupField("GameID", "ID игры", "GameTitles", "GameID", "GameName", isRequired: true),
                     new FieldDefinition("StartDate", "Дата начала", FieldType.Date) { IsRequired = true },
-                    new FieldDefinition("EndDate", "Дата окончания", FieldType.Date) { IsRequired = true },
+                    new FieldDefinition("EndDate", "Дата окончания", FieldType.Date),
                     new FieldDefinition("PrizePool", "Призовой фонд", FieldType.Decimal),
                     new FieldDefinition("Organizer", "Организатор", FieldType.Text),
                     new FieldDefinition("Location", "Место проведения", FieldType.Text),
                     new FieldDefinition("FormatType", "Формат", FieldType.Text) { IsRequired = true },
-                    new FieldDefinition("MaxTeams", "Макс. команд", FieldType.Integer) { IsRequired = true }
+                    new FieldDefinition("MaxTeams", "Макс. команд", FieldType.Integer) { IsRequired = true },
+                    participantMode
                 });
 
             definition.SaveValidator = context =>
@@ -34,8 +40,8 @@ namespace Tournaments.WPF.Services
                 }
 
                 DateTime startDate = GetDate(context.Values, "StartDate");
-                DateTime endDate = GetDate(context.Values, "EndDate");
-                if (endDate < startDate)
+                DateTime? endDate = GetNullableDate(context.Values, "EndDate");
+                if (endDate.HasValue && endDate.Value < startDate)
                 {
                     return EntityValidationResult.Fail("Дата окончания должна быть позже или равна дате начала.");
                 }
@@ -58,7 +64,7 @@ namespace Tournaments.WPF.Services
                 int streams = Count(context.Database, "Streams", row => ValuesEqual(row["TournamentID"], tournamentId));
                 int sponsors = Count(context.Database, "TournamentSponsors", row => ValuesEqual(row["TournamentID"], tournamentId));
 
-                if (stages > 0 || participants > 0 || matches > 0 || streams > 0 || sponsors > 0)
+                if (stages > 0 || participants > 0 || matches > 0 || sponsors > 0 || streams > 0)
                 {
                     return EntityValidationResult.Fail("Нельзя удалить турнир: существуют связанные этапы, участники, матчи, трансляции или спонсоры.");
                 }
@@ -83,7 +89,7 @@ namespace Tournaments.WPF.Services
                 new FieldDefinition[]
                 {
                     new FieldDefinition("StageID", "ID этапа", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
-                    new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsRequired = true },
+                    CreateLookupField("TournamentID", "ID турнира", "Tournaments", "TournamentID", "TournamentName", isRequired: true),
                     new FieldDefinition("StageName", "Название этапа", FieldType.Text) { IsRequired = true },
                     new FieldDefinition("StageOrder", "Порядок этапа", FieldType.Integer) { IsRequired = true },
                     bracketType
@@ -121,11 +127,12 @@ namespace Tournaments.WPF.Services
                 "TournamentParticipants",
                 "Участники турниров",
                 new[] { "ParticipationID" },
-                new[]
+                new FieldDefinition[]
                 {
                     new FieldDefinition("ParticipationID", "ID участия", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
-                    new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsRequired = true },
-                    new FieldDefinition("TeamID", "ID команды", FieldType.Integer) { IsRequired = true },
+                    CreateLookupField("TournamentID", "ID турнира", "Tournaments", "TournamentID", "TournamentName", isRequired: true),
+                    CreateLookupField("TeamID", "ID команды", "Teams", "TeamID", "TeamName"),
+                    CreateLookupField("PlayerID", "ID игрока", "Players", "PlayerID", "Nickname"),
                     new FieldDefinition("Seed", "Seed", FieldType.Integer),
                     new FieldDefinition("FinalPlace", "Итоговое место", FieldType.Integer)
                 });
@@ -133,25 +140,72 @@ namespace Tournaments.WPF.Services
             definition.SaveValidator = context =>
             {
                 int tournamentId = GetInt(context.Values, "TournamentID");
-                int teamId = GetInt(context.Values, "TeamID");
                 int currentId = GetOriginalInt(context, "ParticipationID");
+                int? teamId = GetNullableInt(context.Values, "TeamID");
+                int? playerId = GetNullableInt(context.Values, "PlayerID");
 
                 if (!context.Database.RecordExists("Tournaments", "TournamentID", tournamentId))
                 {
                     return EntityValidationResult.Fail("Турнира с таким ID не существует.");
                 }
 
-                if (!context.Database.RecordExists("Teams", "TeamID", teamId))
+                string participantMode = GetTournamentParticipantMode(context.Database, tournamentId);
+                if (string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    if (!context.Database.GetAvailableColumns("TournamentParticipants").Any(column => string.Equals(column, "PlayerID", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return EntityValidationResult.Fail("Текущее хранилище не поддерживает участников-игроков для турниров.");
+                    }
+
+                    if (!playerId.HasValue)
+                    {
+                        return EntityValidationResult.Fail("Для турнира игроков нужно указать ID игрока.");
+                    }
+
+                    if (teamId.HasValue)
+                    {
+                        return EntityValidationResult.Fail("Для турнира игроков указывайте только ID игрока.");
+                    }
+
+                    if (!context.Database.RecordExists("Players", "PlayerID", playerId.Value))
+                    {
+                        return EntityValidationResult.Fail("Игрока с таким ID не существует.");
+                    }
+
+                    int duplicates = Count(context.Database, "TournamentParticipants", row =>
+                        ValuesEqual(row["TournamentID"], tournamentId) &&
+                        ValuesEqual(row["PlayerID"], playerId.Value) &&
+                        (context.IsInsert || !ValuesEqual(row["ParticipationID"], currentId)));
+
+                    if (duplicates > 0)
+                    {
+                        return EntityValidationResult.Fail("Этот игрок уже добавлен в турнир.");
+                    }
+
+                    return EntityValidationResult.Success();
+                }
+
+                if (!teamId.HasValue)
+                {
+                    return EntityValidationResult.Fail("Для командного турнира нужно указать ID команды.");
+                }
+
+                if (playerId.HasValue)
+                {
+                    return EntityValidationResult.Fail("Для командного турнира указывайте только ID команды.");
+                }
+
+                if (!context.Database.RecordExists("Teams", "TeamID", teamId.Value))
                 {
                     return EntityValidationResult.Fail("Команды с таким ID не существует.");
                 }
 
-                int duplicates = Count(context.Database, "TournamentParticipants", row =>
+                int teamDuplicates = Count(context.Database, "TournamentParticipants", row =>
                     ValuesEqual(row["TournamentID"], tournamentId) &&
-                    ValuesEqual(row["TeamID"], teamId) &&
+                    ValuesEqual(row["TeamID"], teamId.Value) &&
                     (context.IsInsert || !ValuesEqual(row["ParticipationID"], currentId)));
 
-                if (duplicates > 0)
+                if (teamDuplicates > 0)
                 {
                     return EntityValidationResult.Fail("Эта команда уже добавлена в турнир.");
                 }
@@ -169,10 +223,10 @@ namespace Tournaments.WPF.Services
                 "TournamentSponsors",
                 "Спонсоры турниров",
                 new[] { "TournamentID", "SponsorID" },
-                new[]
+                new FieldDefinition[]
                 {
-                    new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsRequired = true, IsKey = true },
-                    new FieldDefinition("SponsorID", "ID спонсора", FieldType.Integer) { IsRequired = true, IsKey = true },
+                    CreateLookupField("TournamentID", "ID турнира", "Tournaments", "TournamentID", "TournamentName", isRequired: true, isKey: true),
+                    CreateLookupField("SponsorID", "ID спонсора", "Sponsors", "SponsorID", "SponsorName", isRequired: true, isKey: true),
                     new FieldDefinition("SponsorshipAmount", "Сумма спонсорства", FieldType.Decimal),
                     new FieldDefinition("Currency", "Валюта", FieldType.Text) { IsRequired = true }
                 });
@@ -212,5 +266,4 @@ namespace Tournaments.WPF.Services
         }
     }
 }
-
 

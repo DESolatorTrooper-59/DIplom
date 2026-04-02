@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using Tournaments.WPF.Models;
 
 namespace Tournaments.WPF.Services
@@ -17,6 +18,18 @@ namespace Tournaments.WPF.Services
             return Count(database, tableName, row =>
                 StringEquals(row[valueColumn], mainValue) &&
                 (isInsert || !ValuesEqual(row[idColumn], currentId))) > 0;
+        }
+
+        private static FieldDefinition CreateLookupField(string name, string label, string lookupTableName, string lookupColumnName, string lookupDisplayColumnName = null, bool isRequired = false, bool isKey = false)
+        {
+            return new FieldDefinition(name, label, FieldType.Integer)
+            {
+                IsRequired = isRequired,
+                IsKey = isKey,
+                LookupTableName = lookupTableName,
+                LookupColumnName = lookupColumnName,
+                LookupDisplayColumnName = lookupDisplayColumnName
+            };
         }
 
         private static string GetString(IDictionary<string, object> values, string key)
@@ -74,6 +87,27 @@ namespace Tournaments.WPF.Services
             return Convert.ToBoolean(values[key]);
         }
 
+        private static string GetTournamentParticipantMode(DatabaseService database, int tournamentId)
+        {
+            DataTable tournaments = database.GetTable("Tournaments");
+            if (!tournaments.Columns.Contains("TournamentID"))
+            {
+                return "Команды";
+            }
+
+            DataRow row = tournaments.Rows
+                .Cast<DataRow>()
+                .FirstOrDefault(item => ValuesEqual(item["TournamentID"], tournamentId));
+
+            if (row == null || !tournaments.Columns.Contains("ParticipantMode") || row["ParticipantMode"] == DBNull.Value)
+            {
+                return "Команды";
+            }
+
+            string mode = Convert.ToString(row["ParticipantMode"]);
+            return string.IsNullOrWhiteSpace(mode) ? "Команды" : mode.Trim();
+        }
+
         private static bool ValuesEqual(object left, object right)
         {
             if (left == DBNull.Value)
@@ -125,3 +159,4 @@ namespace Tournaments.WPF.Services
         }
     }
 }
+

@@ -22,6 +22,8 @@ namespace Tournaments.WPF.Views
         private readonly EntityDefinition _definition;
         private readonly string _currentLogin;
         private readonly SearchMatchBackgroundConverter _searchMatchBackgroundConverter = new SearchMatchBackgroundConverter();
+        private readonly DbNullValueConverter _dbNullValueConverter = new DbNullValueConverter();
+        private readonly Dictionary<string, IReadOnlyList<LookupOption>> _lookupOptions = new Dictionary<string, IReadOnlyList<LookupOption>>(StringComparer.OrdinalIgnoreCase);
         private DataTable _sourceTable;
         private bool _isLoaded;
         private DataRow _pendingInsertRow;
@@ -59,6 +61,7 @@ namespace Tournaments.WPF.Views
                 _pendingEditRow = null;
                 _pendingEditOriginalValues = null;
                 _sourceTable = _crud.Load(_definition);
+                _lookupOptions.Clear();
                 GridItems.ItemsSource = _sourceTable.DefaultView;
                 ApplyFilter();
             }
@@ -310,7 +313,17 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
+            if (field.Type == FieldType.Choice)
+            {
+                e.Column = CreateChoiceColumn(field);
+            }
+            else if (!string.IsNullOrWhiteSpace(field.LookupTableName) && !string.IsNullOrWhiteSpace(field.LookupColumnName))
+            {
+                e.Column = CreateLookupColumn(field);
+            }
+
             e.Column.Header = field.Label;
+            e.Column.SortMemberPath = field.Name;
             e.Column.IsReadOnly = field.IsReadOnly || field.IsIdentity;
             ApplySearchHighlightStyle(e.Column, e.PropertyName);
 
@@ -331,7 +344,6 @@ namespace Tournaments.WPF.Views
                 }
             }
         }
-
         private void GridItems_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
         {
             if (_isFinalizingPendingChange)
@@ -689,14 +701,26 @@ namespace Tournaments.WPF.Views
                 }
             }
 
-            if (string.Equals(_definition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase) &&
-                _sourceTable.Columns.Contains("Organizer") &&
-                !string.IsNullOrWhiteSpace(_currentLogin))
+            if (string.Equals(_definition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase))
             {
-                row["Organizer"] = _currentLogin;
+                if (_sourceTable.Columns.Contains("Organizer") && !string.IsNullOrWhiteSpace(_currentLogin))
+                {
+                    row["Organizer"] = _currentLogin;
+                }
+
+                if (_sourceTable.Columns.Contains("ParticipantMode") && row["ParticipantMode"] == DBNull.Value)
+                {
+                    row["ParticipantMode"] = "Команды";
+                }
+            }
+
+            if (string.Equals(_definition.TableName, "Players", StringComparison.OrdinalIgnoreCase) &&
+                _sourceTable.Columns.Contains("RealName") &&
+                row["RealName"] == DBNull.Value)
+            {
+                row["RealName"] = "Скрыто";
             }
         }
-
         private static bool IsRequiredValueMissing(FieldDefinition field, object value)
         {
             if (field.Type == FieldType.Boolean)
@@ -791,6 +815,112 @@ namespace Tournaments.WPF.Views
             column.CellStyle = style;
         }
 
+        private DataGridColumn CreateChoiceColumn(FieldDefinition field)
+        {
+            return new DataGridComboBoxColumn
+            {
+                ItemsSource = field.AllowedValues.ToList(),
+                SelectedItemBinding = CreateEditableBinding(field.Name),
+                SortMemberPath = field.Name
+            };
+        }
+
+        private DataGridColumn CreateLookupColumn(FieldDefinition field)
+        {
+            IReadOnlyList<LookupOption> options = GetLookupOptions(field);
+            return new DataGridComboBoxColumn
+            {
+                ItemsSource = options,
+                DisplayMemberPath = nameof(LookupOption.Display),
+                SelectedValuePath = nameof(LookupOption.Value),
+                SelectedValueBinding = CreateEditableBinding(field.Name),
+                SortMemberPath = field.Name
+            };
+        }
+
+        private Binding CreateEditableBinding(string propertyName)
+        {
+            return new Binding(propertyName)
+            {
+                Mode = BindingMode.TwoWay,
+                UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
+                Converter = _dbNullValueConverter
+            };
+        }
+
+        private IReadOnlyList<LookupOption> GetLookupOptions(FieldDefinition field)
+        {
+            string cacheKey = BuildLookupCacheKey(field);
+            if (_lookupOptions.TryGetValue(cacheKey, out IReadOnlyList<LookupOption> cachedOptions))
+            {
+                return cachedOptions;
+            }
+
+            if (string.IsNullOrWhiteSpace(field.LookupTableName) || string.IsNullOrWhiteSpace(field.LookupColumnName))
+            {
+                return Array.Empty<LookupOption>();
+            }
+
+            try
+            {
+                DataTable lookupTable = _database.GetTable(field.LookupTableName);
+                if (!lookupTable.Columns.Contains(field.LookupColumnName))
+                {
+                    return Array.Empty<LookupOption>();
+                }
+
+                string displayColumnName = !string.IsNullOrWhiteSpace(field.LookupDisplayColumnName) && lookupTable.Columns.Contains(field.LookupDisplayColumnName)
+                    ? field.LookupDisplayColumnName
+                    : null;
+
+                List<LookupOption> options = lookupTable.Rows
+                    .Cast<DataRow>()
+                    .Where(row => row[field.LookupColumnName] != DBNull.Value)
+                    .OrderBy(row => Convert.ToString(row[field.LookupColumnName]))
+                    .Select(row => new LookupOption(
+                        row[field.LookupColumnName],
+                        BuildLookupDisplayText(row, field.LookupColumnName, displayColumnName)))
+                    .ToList();
+
+                if (!field.IsRequired)
+                {
+                    options.Insert(0, new LookupOption(null, string.Empty));
+                }
+
+                _lookupOptions[cacheKey] = options;
+                return options;
+            }
+            catch
+            {
+                return Array.Empty<LookupOption>();
+            }
+        }
+
+        private static string BuildLookupCacheKey(FieldDefinition field)
+        {
+            return string.Join("|",
+                field.LookupTableName ?? string.Empty,
+                field.LookupColumnName ?? string.Empty,
+                field.LookupDisplayColumnName ?? string.Empty,
+                field.IsRequired.ToString());
+        }
+
+        private static string BuildLookupDisplayText(DataRow row, string valueColumnName, string displayColumnName)
+        {
+            string valueText = Convert.ToString(row[valueColumnName]);
+            if (string.IsNullOrWhiteSpace(displayColumnName) || row[displayColumnName] == DBNull.Value)
+            {
+                return valueText;
+            }
+
+            string displayText = Convert.ToString(row[displayColumnName]);
+            if (string.IsNullOrWhiteSpace(displayText) || string.Equals(displayText, valueText, StringComparison.CurrentCultureIgnoreCase))
+            {
+                return valueText;
+            }
+
+            return valueText + " - " + displayText;
+        }
         private bool CanEditColumn(DataGridColumn column, bool isInsertMode)
         {
             FieldDefinition field = GetFieldForColumn(column);

@@ -1,4 +1,4 @@
-name: Build Desktop Apps
+name: Build WPF App
 
 on:
   push:
@@ -14,9 +14,8 @@ jobs:
     runs-on: windows-latest
 
     env:
-      SOLUTION_PATH: Tournaments.sln
+      PROJECT_PATH: WPF/Tournaments.WPF.csproj
       BUILD_CONFIGURATION: Release
-      BUILD_PLATFORM: Any CPU
 
     steps:
       - name: Checkout
@@ -30,19 +29,11 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
 
-      - name: Restore solution
-        run: msbuild $env:SOLUTION_PATH /t:Restore /p:Configuration="$env:BUILD_CONFIGURATION" /p:Platform="$env:BUILD_PLATFORM"
+      - name: Restore WPF project
+        run: msbuild $env:PROJECT_PATH /t:Restore /p:Configuration="$env:BUILD_CONFIGURATION"
 
-      - name: Build solution
-        run: msbuild $env:SOLUTION_PATH /t:Build /p:Configuration="$env:BUILD_CONFIGURATION" /p:Platform="$env:BUILD_PLATFORM" /m
-
-      - name: Upload WinForms artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tournaments-winforms-release
-          path: |
-            Tournaments/bin/Release/**
-          if-no-files-found: error
+      - name: Build WPF project
+        run: msbuild $env:PROJECT_PATH /t:Build /p:Configuration="$env:BUILD_CONFIGURATION" /m
 
       - name: Upload WPF artifact
         uses: actions/upload-artifact@v4

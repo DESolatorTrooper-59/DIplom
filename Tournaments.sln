@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34728.123
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tournaments", "Tournaments\Tournaments.csproj", "{B1DF8D0D-2936-487A-ABC9-77D2137F6711}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tournaments.WinForms", "Tournaments\Tournaments.WinForms.csproj", "{B1DF8D0D-2936-487A-ABC9-77D2137F6711}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "WPF", "WPF", "{2481DD90-4409-10B6-4FAC-38EB559C7BC3}"
 EndProject

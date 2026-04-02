@@ -166,6 +166,12 @@ namespace Tournaments.WPF.Services
                     throw new InvalidOperationException("Выбранный турнир не найден.");
                 }
 
+                if (tournament.Table.Columns.Contains("ParticipantMode") &&
+                    string.Equals(Convert.ToString(tournament["ParticipantMode"]), "Игроки", StringComparison.CurrentCultureIgnoreCase))
+                {
+                    throw new InvalidOperationException("Турнирная сетка пока поддерживается только для турниров с командами.");
+                }
+
                 List<int> orderedTeamIds = GetOrderedParticipantTeamIds(tournamentId);
                 if (orderedTeamIds.Count < 2)
                 {
@@ -546,6 +552,7 @@ namespace Tournaments.WPF.Services
                 Column("ParticipationID", typeof(int)),
                 Column("TournamentID", typeof(int)),
                 Column("TeamID", typeof(int)),
+                Column("PlayerID", typeof(int)),
                 Column("Seed", typeof(int)),
                 Column("FinalPlace", typeof(int)));
 
@@ -559,7 +566,8 @@ namespace Tournaments.WPF.Services
                 Column("Organizer", typeof(string)),
                 Column("Location", typeof(string)),
                 Column("FormatType", typeof(string)),
-                Column("MaxTeams", typeof(int)));
+                Column("MaxTeams", typeof(int)),
+                Column("ParticipantMode", typeof(string)));
 
             CreateTable("TournamentSponsors", null,
                 Column("TournamentID", typeof(int)),
@@ -672,7 +680,8 @@ namespace Tournaments.WPF.Services
                 ["Organizer"] = "admin",
                 ["Location"] = "Moscow",
                 ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 8
+                ["MaxTeams"] = 8,
+                ["ParticipantMode"] = "Команды"
             });
 
             SeedRow("Tournaments", new Dictionary<string, object>
@@ -686,7 +695,8 @@ namespace Tournaments.WPF.Services
                 ["Organizer"] = "admin",
                 ["Location"] = "Belgrade",
                 ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 4
+                ["MaxTeams"] = 4,
+                ["ParticipantMode"] = "Команды"
             });
 
             SeedRow("TournamentStages", new Dictionary<string, object>
@@ -793,13 +803,14 @@ namespace Tournaments.WPF.Services
             });
         }
 
-        private void SeedTournamentParticipant(int participationId, int tournamentId, int teamId, int seed)
+        private void SeedTournamentParticipant(int participationId, int tournamentId, int? teamId, int seed, int? playerId = null)
         {
             SeedRow("TournamentParticipants", new Dictionary<string, object>
             {
                 ["ParticipationID"] = participationId,
                 ["TournamentID"] = tournamentId,
-                ["TeamID"] = teamId,
+                ["TeamID"] = teamId.HasValue ? (object)teamId.Value : DBNull.Value,
+                ["PlayerID"] = playerId.HasValue ? (object)playerId.Value : DBNull.Value,
                 ["Seed"] = seed,
                 ["FinalPlace"] = DBNull.Value
             });
@@ -883,6 +894,16 @@ namespace Tournaments.WPF.Services
             {
                 row["Currency"] = "USD";
             }
+
+            if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) && IsNull(row["RealName"]))
+            {
+                row["RealName"] = "Скрыто";
+            }
+
+            if (string.Equals(tableName, "Tournaments", StringComparison.OrdinalIgnoreCase) && row.Table.Columns.Contains("ParticipantMode") && IsNull(row["ParticipantMode"]))
+            {
+                row["ParticipantMode"] = "Команды";
+            }
         }
 
         private DataRow FindRow(DataTable table, string[] keyColumns, IDictionary<string, object> originalValues)
@@ -921,7 +942,7 @@ namespace Tournaments.WPF.Services
             return GetRequiredTable("TournamentParticipants")
                 .Rows
                 .Cast<DataRow>()
-                .Where(row => AreEqual(row["TournamentID"], tournamentId))
+                .Where(row => AreEqual(row["TournamentID"], tournamentId) && row["TeamID"] != DBNull.Value)
                 .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
                 .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
                 .ThenBy(row => Convert.ToInt32(row["TeamID"]))
@@ -1106,6 +1127,8 @@ namespace Tournaments.WPF.Services
         }
     }
 }
+
+
 
 
 

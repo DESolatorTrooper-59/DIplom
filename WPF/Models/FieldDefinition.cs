@@ -26,6 +26,12 @@ namespace Tournaments.WPF.Models
 
         public bool IsKey { get; set; }
 
+        public string LookupTableName { get; set; }
+
+        public string LookupColumnName { get; set; }
+
+        public string LookupDisplayColumnName { get; set; }
+
         public IList<string> AllowedValues { get; }
     }
 }

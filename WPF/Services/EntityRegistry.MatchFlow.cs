@@ -14,8 +14,8 @@ namespace Tournaments.WPF.Services
                 new[]
                 {
                     new FieldDefinition("TeamPlayerID", "ID связи", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
-                    new FieldDefinition("TeamID", "ID команды", FieldType.Integer) { IsRequired = true },
-                    new FieldDefinition("PlayerID", "ID игрока", FieldType.Integer) { IsRequired = true },
+                    CreateLookupField("TeamID", "ID команды", "Teams", "TeamID", "TeamName", isRequired: true),
+                    CreateLookupField("PlayerID", "ID игрока", "Players", "PlayerID", "Nickname", isRequired: true),
                     new FieldDefinition("JoinDate", "Дата присоединения", FieldType.Date) { IsRequired = true },
                     new FieldDefinition("LeaveDate", "Дата ухода", FieldType.Date),
                     new FieldDefinition("IsActive", "Активен", FieldType.Boolean) { IsRequired = true },
@@ -82,12 +82,12 @@ namespace Tournaments.WPF.Services
                 new FieldDefinition[]
                 {
                     new FieldDefinition("MatchID", "ID матча", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
-                    new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsRequired = true },
-                    new FieldDefinition("StageID", "ID этапа", FieldType.Integer) { IsRequired = true },
+                    CreateLookupField("TournamentID", "ID турнира", "Tournaments", "TournamentID", "TournamentName", isRequired: true),
+                    CreateLookupField("StageID", "ID этапа", "TournamentStages", "StageID", "StageName", isRequired: true),
                     new FieldDefinition("MatchNumber", "Номер матча", FieldType.Integer) { IsRequired = true },
-                    new FieldDefinition("Team1ID", "Команда 1", FieldType.Integer),
-                    new FieldDefinition("Team2ID", "Команда 2", FieldType.Integer),
-                    new FieldDefinition("WinnerTeamID", "Победитель", FieldType.Integer),
+                    CreateLookupField("Team1ID", "Команда 1", "Teams", "TeamID", "TeamName"),
+                    CreateLookupField("Team2ID", "Команда 2", "Teams", "TeamID", "TeamName"),
+                    CreateLookupField("WinnerTeamID", "Победитель", "Teams", "TeamID", "TeamName"),
                     new FieldDefinition("Team1Score", "Счёт команды 1", FieldType.Integer),
                     new FieldDefinition("Team2Score", "Счёт команды 2", FieldType.Integer),
                     new FieldDefinition("MatchDate", "Дата матча", FieldType.Text),
@@ -174,8 +174,8 @@ namespace Tournaments.WPF.Services
                 new[]
                 {
                     new FieldDefinition("StreamID", "ID трансляции", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
-                    new FieldDefinition("TournamentID", "ID турнира", FieldType.Integer) { IsRequired = true },
-                    new FieldDefinition("MatchID", "ID матча", FieldType.Integer),
+                    CreateLookupField("TournamentID", "ID турнира", "Tournaments", "TournamentID", "TournamentName", isRequired: true),
+                    CreateLookupField("MatchID", "ID матча", "Matches", "MatchID", "MatchNumber"),
                     new FieldDefinition("Platform", "Платформа", FieldType.Text),
                     new FieldDefinition("StreamURL", "Ссылка", FieldType.Text)
                 });
@@ -203,3 +203,4 @@ namespace Tournaments.WPF.Services
         }
     }
 }
+
