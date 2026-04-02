@@ -1,0 +1,886 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using Tournaments.WPF.Models;
+
+namespace Tournaments.WPF.Services
+{
+    internal sealed class SqlServerDataBackend : IDataBackend
+    {
+        private readonly string _connectionString;
+        private readonly string _storageLabel;
+        private readonly Dictionary<string, IReadOnlyCollection<string>> _columnCache = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _identityCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _identityResolved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        public SqlServerDataBackend(string connectionString, string storageLabel)
+        {
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException("Строка подключения к SQL Server не может быть пустой.", nameof(connectionString));
+            }
+
+            _connectionString = connectionString;
+            _storageLabel = string.IsNullOrWhiteSpace(storageLabel) ? "MS SQL Server" : storageLabel;
+        }
+
+        public string ModeTitle => "MS SQL Server";
+
+        public string StorageLabel => _storageLabel;
+
+        public bool IsTestMode => false;
+
+        public DataTable GetTable(string tableName)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                return LoadWholeTable(tableName, connection, null);
+            }
+        }
+
+        public IReadOnlyCollection<string> GetColumns(string tableName)
+        {
+            if (_columnCache.TryGetValue(tableName, out IReadOnlyCollection<string> cachedColumns))
+            {
+                return cachedColumns;
+            }
+
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                string safeTable = EscapeIdentifier(tableName);
+                DataTable schema = ExecuteTableQuery(connection, null, "SELECT TOP (0) * FROM [dbo].[" + safeTable + "]", tableName, null);
+                IReadOnlyCollection<string> columns = schema.Columns.Cast<DataColumn>().Select(column => column.ColumnName).ToArray();
+                _columnCache[tableName] = columns;
+                return columns;
+            }
+        }
+
+        public bool ValidateLogin(string login, string password)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Organizer] WHERE [Login] = @Login AND [Password] = @Password";
+                AddParameter(command, "@Login", login);
+                AddParameter(command, "@Password", password);
+                return Convert.ToInt32(command.ExecuteScalar()) > 0;
+            }
+        }
+
+        public void EnsureOrganizerUser(string login, string password)
+        {
+        }
+
+        public bool RecordExists(string tableName, string columnName, object value)
+        {
+            string safeTable = EscapeIdentifier(tableName);
+            string safeColumn = EscapeIdentifier(columnName);
+
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                if (value == null)
+                {
+                    command.CommandText = "SELECT COUNT(1) FROM [dbo].[" + safeTable + "] WHERE [" + safeColumn + "] IS NULL";
+                }
+                else
+                {
+                    command.CommandText = "SELECT COUNT(1) FROM [dbo].[" + safeTable + "] WHERE [" + safeColumn + "] = @Value";
+                    AddParameter(command, "@Value", value);
+                }
+
+                return Convert.ToInt32(command.ExecuteScalar()) > 0;
+            }
+        }
+
+        public int CountRows(string tableName, Func<DataRow, bool> predicate)
+        {
+            return GetTable(tableName).Rows.Cast<DataRow>().Count(predicate);
+        }
+
+        public int? PeekNextIdentityValue(string tableName)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                return ReadNextIdentityValue(tableName, connection, null);
+            }
+        }
+
+        public void Insert(string tableName, IDictionary<string, object> values)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                InsertRow(connection, null, tableName, values, false, false);
+            }
+        }
+
+        public void Update(string tableName, string[] keyColumns, IDictionary<string, object> values, IDictionary<string, object> originalValues)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                UpdateRow(connection, null, tableName, keyColumns, values, originalValues);
+            }
+        }
+
+        public void Delete(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                DeleteRow(connection, null, tableName, keyColumns, originalValues);
+            }
+        }
+
+        public void ReplaceTableContents(string tableName, DataTable importedTable)
+        {
+            if (importedTable == null)
+            {
+                throw new ArgumentNullException(nameof(importedTable));
+            }
+
+            string safeTable = EscapeIdentifier(tableName);
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlTransaction transaction = connection.BeginTransaction())
+            {
+                string identityColumn = GetIdentityColumn(tableName, connection, transaction);
+                bool useIdentityInsert = identityColumn != null && importedTable.Rows.Count > 0;
+
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[" + safeTable + "]", null);
+                if (useIdentityInsert)
+                {
+                    ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safeTable + "] ON", null);
+                }
+
+                try
+                {
+                    foreach (DataRow row in importedTable.Rows)
+                    {
+                        Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        foreach (DataColumn column in importedTable.Columns)
+                        {
+                            values[column.ColumnName] = row[column] == DBNull.Value ? null : row[column];
+                        }
+
+                        InsertRow(connection, transaction, tableName, values, true, false);
+                    }
+                }
+                finally
+                {
+                    if (useIdentityInsert)
+                    {
+                        ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safeTable + "] OFF", null);
+                    }
+                }
+
+                transaction.Commit();
+            }
+        }
+
+        public int GenerateTournamentBracket(int tournamentId)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlTransaction transaction = connection.BeginTransaction())
+            {
+                DataTable tournaments = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[Tournaments] WHERE [TournamentID] = @TournamentID", "Tournaments", command => AddParameter(command, "@TournamentID", tournamentId));
+                DataRow tournament = tournaments.Rows.Cast<DataRow>().FirstOrDefault();
+                if (tournament == null)
+                {
+                    throw new InvalidOperationException("Выбранный турнир не найден.");
+                }
+
+                List<int> orderedTeamIds = GetOrderedParticipantTeamIds(tournamentId, connection, transaction);
+                if (orderedTeamIds.Count < 2)
+                {
+                    throw new InvalidOperationException("Для построения сетки нужно минимум две команды-участницы.");
+                }
+
+                RemoveGeneratedBracket(connection, transaction, tournamentId);
+
+                int bracketSize = NextPowerOfTwo(orderedTeamIds.Count);
+                int roundCount = (int)Math.Log(bracketSize, 2);
+                int[] seedPositions = BuildSeedPositions(bracketSize);
+                int?[] slots = new int?[bracketSize];
+                for (int index = 0; index < seedPositions.Length; index++)
+                {
+                    int seed = seedPositions[index];
+                    if (seed <= orderedTeamIds.Count)
+                    {
+                        slots[index] = orderedTeamIds[seed - 1];
+                    }
+                }
+
+                DateTime tournamentStartDate = Convert.ToDateTime(tournament["StartDate"]);
+                int matchNumber = 1;
+                int matchesInRound = bracketSize / 2;
+                int createdMatches = 0;
+
+                for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
+                {
+                    int teamsInRound = bracketSize / (int)Math.Pow(2, roundIndex);
+                    int stageId = InsertBracketStage(connection, transaction, tournamentId, roundIndex + 1, teamsInRound, roundIndex == roundCount - 1);
+
+                    for (int matchIndex = 0; matchIndex < matchesInRound; matchIndex++)
+                    {
+                        Dictionary<string, object> matchValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["TournamentID"] = tournamentId,
+                            ["StageID"] = stageId,
+                            ["MatchNumber"] = matchNumber++,
+                            ["Team1ID"] = roundIndex == 0 ? (object)slots[matchIndex * 2] : null,
+                            ["Team2ID"] = roundIndex == 0 ? (object)slots[matchIndex * 2 + 1] : null,
+                            ["WinnerTeamID"] = null,
+                            ["Team1Score"] = 0,
+                            ["Team2Score"] = 0,
+                            ["MatchDate"] = tournamentStartDate.AddDays(roundIndex),
+                            ["BestOf"] = roundIndex == roundCount - 1 ? 5 : 3,
+                            ["Status"] = "Scheduled"
+                        };
+
+                        InsertRow(connection, transaction, "Matches", matchValues, true, false);
+                        createdMatches++;
+                    }
+
+                    matchesInRound /= 2;
+                }
+
+                PropagateBracketState(connection, transaction, tournamentId);
+                transaction.Commit();
+                return createdMatches;
+            }
+        }
+
+        public void UpdateBracketMatch(int tournamentId, BracketMatchUpdateRequest request)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlTransaction transaction = connection.BeginTransaction())
+            {
+                List<SqlBracketRoundState> rounds = GetGeneratedBracketRounds(tournamentId, connection, transaction);
+                if (rounds.Count == 0)
+                {
+                    throw new InvalidOperationException("Для выбранного турнира сетка еще не создана.");
+                }
+
+                SqlBracketRoundState targetRound = rounds.FirstOrDefault(round => round.Matches.Any(row => AreEqual(row["MatchID"], request.MatchId)));
+                if (targetRound == null)
+                {
+                    throw new InvalidOperationException("Матч турнирной сетки не найден.");
+                }
+
+                DataRow match = targetRound.Matches.First(row => AreEqual(row["MatchID"], request.MatchId));
+                List<int> availableTeams = GetOrderedParticipantTeamIds(tournamentId, connection, transaction);
+                int? team1Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team1Id, availableTeams) : ToNullableInt(match["Team1ID"]);
+                int? team2Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team2Id, availableTeams) : ToNullableInt(match["Team2ID"]);
+
+                if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
+                {
+                    throw new InvalidOperationException("В одном матче нельзя выбрать одну и ту же команду дважды.");
+                }
+
+                if (request.Team1Score < 0 || request.Team2Score < 0)
+                {
+                    throw new InvalidOperationException("Счет команды не может быть отрицательным.");
+                }
+
+                if (request.BestOf <= 0 || request.BestOf % 2 == 0)
+                {
+                    throw new InvalidOperationException("Best Of должен быть положительным нечетным числом.");
+                }
+
+                if (request.MatchDate == default(DateTime))
+                {
+                    throw new InvalidOperationException("Укажите корректную дату матча.");
+                }
+
+                string status = string.IsNullOrWhiteSpace(request.Status) ? "Scheduled" : request.Status.Trim();
+                match["Team1ID"] = team1Id.HasValue ? (object)team1Id.Value : DBNull.Value;
+                match["Team2ID"] = team2Id.HasValue ? (object)team2Id.Value : DBNull.Value;
+                match["Team1Score"] = request.Team1Score;
+                match["Team2Score"] = request.Team2Score;
+                match["BestOf"] = request.BestOf;
+                match["MatchDate"] = request.MatchDate;
+                match["Status"] = status;
+
+                int? winnerTeamId = NormalizeWinnerTeamId(request.WinnerTeamId, team1Id, team2Id, status, request.Team1Score, request.Team2Score);
+                match["WinnerTeamID"] = winnerTeamId.HasValue ? (object)winnerTeamId.Value : DBNull.Value;
+
+                PropagateBracketState(rounds);
+                PersistBracketMatches(connection, transaction, rounds);
+                transaction.Commit();
+            }
+        }
+
+        private SqlConnection CreateOpenConnection()
+        {
+            SqlConnection connection = new SqlConnection(_connectionString);
+            connection.Open();
+            return connection;
+        }
+
+        private DataTable LoadWholeTable(string tableName, SqlConnection connection, SqlTransaction transaction)
+        {
+            string safeTable = EscapeIdentifier(tableName);
+            return ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[" + safeTable + "]", tableName, null);
+        }
+
+        private DataTable ExecuteTableQuery(SqlConnection connection, SqlTransaction transaction, string sql, string tableName, Action<SqlCommand> configure)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                configure?.Invoke(command);
+
+                using (SqlDataAdapter adapter = new SqlDataAdapter(command))
+                {
+                    DataTable table = new DataTable(tableName);
+                    adapter.Fill(table);
+                    return table;
+                }
+            }
+        }
+
+        private void ExecuteNonQuery(SqlConnection connection, SqlTransaction transaction, string sql, Action<SqlCommand> configure)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                configure?.Invoke(command);
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private int? ReadNextIdentityValue(string tableName, SqlConnection connection, SqlTransaction transaction)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = @"
+SELECT CAST(COALESCE(CAST(ic.last_value AS int), CAST(ic.seed_value AS int) - CAST(ic.increment_value AS int)) + CAST(ic.increment_value AS int) AS int)
+FROM sys.identity_columns ic
+INNER JOIN sys.tables t ON t.object_id = ic.object_id
+INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = 'dbo' AND t.name = @TableName";
+                AddParameter(command, "@TableName", tableName);
+
+                object result = command.ExecuteScalar();
+                return result == null || result == DBNull.Value ? (int?)null : Convert.ToInt32(result);
+            }
+        }
+
+        private string GetIdentityColumn(string tableName, SqlConnection connection, SqlTransaction transaction)
+        {
+            if (_identityCache.TryGetValue(tableName, out string identityColumn))
+            {
+                return identityColumn;
+            }
+
+            if (_identityResolved.Contains(tableName))
+            {
+                return null;
+            }
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = @"
+SELECT c.name
+FROM sys.columns c
+INNER JOIN sys.tables t ON t.object_id = c.object_id
+INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
+WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
+                AddParameter(command, "@TableName", tableName);
+
+                object result = command.ExecuteScalar();
+                _identityResolved.Add(tableName);
+                identityColumn = result == null || result == DBNull.Value ? null : Convert.ToString(result);
+                if (!string.IsNullOrWhiteSpace(identityColumn))
+                {
+                    _identityCache[tableName] = identityColumn;
+                }
+
+                return identityColumn;
+            }
+        }
+
+        private int InsertBracketStage(SqlConnection connection, SqlTransaction transaction, int tournamentId, int stageOrder, int teamsInRound, bool isFinal)
+        {
+            Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["TournamentID"] = tournamentId,
+                ["StageName"] = "Bracket - " + GetRoundTitle(teamsInRound),
+                ["StageOrder"] = 100 + stageOrder,
+                ["BracketType"] = isFinal ? "Final" : "Winner"
+            };
+
+            return InsertRow(connection, transaction, "TournamentStages", values, true, true);
+        }
+
+        private int InsertRow(SqlConnection connection, SqlTransaction transaction, string tableName, IDictionary<string, object> values, bool includeNullValues, bool returnIdentity)
+        {
+            string safeTable = EscapeIdentifier(tableName);
+            IReadOnlyCollection<string> availableColumns = GetColumns(tableName);
+            List<KeyValuePair<string, object>> columnsToInsert = values.Where(pair => ContainsColumn(availableColumns, pair.Key) && (includeNullValues || pair.Value != null)).ToList();
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                if (columnsToInsert.Count == 0)
+                {
+                    command.CommandText = "INSERT INTO [dbo].[" + safeTable + "] DEFAULT VALUES";
+                }
+                else
+                {
+                    List<string> columnNames = new List<string>();
+                    List<string> parameterNames = new List<string>();
+                    for (int index = 0; index < columnsToInsert.Count; index++)
+                    {
+                        string columnName = EscapeIdentifier(columnsToInsert[index].Key);
+                        string parameterName = "@P" + index;
+                        columnNames.Add("[" + columnName + "]");
+                        parameterNames.Add(parameterName);
+                        AddParameter(command, parameterName, columnsToInsert[index].Value);
+                    }
+
+                    command.CommandText = "INSERT INTO [dbo].[" + safeTable + "] (" + string.Join(", ", columnNames) + ") VALUES (" + string.Join(", ", parameterNames) + ")";
+                }
+
+                if (returnIdentity)
+                {
+                    command.CommandText += "; SELECT CAST(SCOPE_IDENTITY() AS INT);";
+                    return Convert.ToInt32(command.ExecuteScalar());
+                }
+
+                command.ExecuteNonQuery();
+                return 0;
+            }
+        }
+
+        private void UpdateRow(SqlConnection connection, SqlTransaction transaction, string tableName, string[] keyColumns, IDictionary<string, object> values, IDictionary<string, object> originalValues)
+        {
+            if (keyColumns == null || keyColumns.Length == 0)
+            {
+                throw new InvalidOperationException("Для обновления записи не заданы ключевые поля.");
+            }
+
+            string safeTable = EscapeIdentifier(tableName);
+            IReadOnlyCollection<string> availableColumns = GetColumns(tableName);
+            List<KeyValuePair<string, object>> columnsToUpdate = values.Where(pair => ContainsColumn(availableColumns, pair.Key)).ToList();
+            if (columnsToUpdate.Count == 0)
+            {
+                return;
+            }
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                List<string> setParts = new List<string>();
+                for (int index = 0; index < columnsToUpdate.Count; index++)
+                {
+                    string columnName = EscapeIdentifier(columnsToUpdate[index].Key);
+                    string parameterName = "@Set" + index;
+                    setParts.Add("[" + columnName + "] = " + parameterName);
+                    AddParameter(command, parameterName, columnsToUpdate[index].Value);
+                }
+
+                List<string> whereParts = BuildWhereClause(command, keyColumns, originalValues);
+                command.CommandText = "UPDATE [dbo].[" + safeTable + "] SET " + string.Join(", ", setParts) + " WHERE " + string.Join(" AND ", whereParts);
+                if (command.ExecuteNonQuery() == 0)
+                {
+                    throw new InvalidOperationException("Запись для обновления не найдена.");
+                }
+            }
+        }
+
+        private void DeleteRow(SqlConnection connection, SqlTransaction transaction, string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            if (keyColumns == null || keyColumns.Length == 0)
+            {
+                throw new InvalidOperationException("Для удаления записи не заданы ключевые поля.");
+            }
+
+            string safeTable = EscapeIdentifier(tableName);
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                List<string> whereParts = BuildWhereClause(command, keyColumns, originalValues);
+                command.CommandText = "DELETE FROM [dbo].[" + safeTable + "] WHERE " + string.Join(" AND ", whereParts);
+                if (command.ExecuteNonQuery() == 0)
+                {
+                    throw new InvalidOperationException("Запись для удаления не найдена.");
+                }
+            }
+        }
+
+        private static List<string> BuildWhereClause(SqlCommand command, IEnumerable<string> keyColumns, IDictionary<string, object> originalValues)
+        {
+            List<string> whereParts = new List<string>();
+            int parameterIndex = 0;
+
+            foreach (string keyColumn in keyColumns)
+            {
+                if (originalValues == null || !originalValues.ContainsKey(keyColumn))
+                {
+                    throw new InvalidOperationException("Не удалось определить исходный ключ записи: " + keyColumn);
+                }
+
+                string safeColumn = EscapeIdentifier(keyColumn);
+                object value = originalValues[keyColumn];
+                if (value == null || value == DBNull.Value)
+                {
+                    whereParts.Add("[" + safeColumn + "] IS NULL");
+                }
+                else
+                {
+                    string parameterName = "@Key" + parameterIndex++;
+                    whereParts.Add("[" + safeColumn + "] = " + parameterName);
+                    AddParameter(command, parameterName, value);
+                }
+            }
+
+            return whereParts;
+        }
+
+        private List<int> GetOrderedParticipantTeamIds(int tournamentId, SqlConnection connection, SqlTransaction transaction)
+        {
+            DataTable participants = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", "TournamentParticipants", command => AddParameter(command, "@TournamentID", tournamentId));
+            return participants.Rows
+                .Cast<DataRow>()
+                .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
+                .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
+                .ThenBy(row => Convert.ToInt32(row["TeamID"]))
+                .Select(row => Convert.ToInt32(row["TeamID"]))
+                .ToList();
+        }
+
+        private void RemoveGeneratedBracket(SqlConnection connection, SqlTransaction transaction, int tournamentId)
+        {
+            ExecuteNonQuery(connection, transaction, @"DELETE M
+FROM [dbo].[Matches] M
+INNER JOIN [dbo].[TournamentStages] S ON S.[StageID] = M.[StageID]
+WHERE S.[TournamentID] = @TournamentID
+  AND S.[StageName] LIKE 'Bracket - %'", command => AddParameter(command, "@TournamentID", tournamentId));
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID AND [StageName] LIKE 'Bracket - %'", command => AddParameter(command, "@TournamentID", tournamentId));
+        }
+
+        private List<SqlBracketRoundState> GetGeneratedBracketRounds(int tournamentId, SqlConnection connection, SqlTransaction transaction)
+        {
+            DataTable stages = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID", "TournamentStages", command => AddParameter(command, "@TournamentID", tournamentId));
+            DataTable matches = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID", "Matches", command => AddParameter(command, "@TournamentID", tournamentId));
+
+            List<DataRow> orderedStages = stages.Rows.Cast<DataRow>()
+                .Where(IsBracketStage)
+                .OrderBy(row => ReadInt(row["StageOrder"], 0))
+                .ThenBy(row => ReadInt(row["StageID"], 0))
+                .ToList();
+
+            List<SqlBracketRoundState> rounds = new List<SqlBracketRoundState>();
+            for (int roundIndex = 0; roundIndex < orderedStages.Count; roundIndex++)
+            {
+                DataRow stage = orderedStages[roundIndex];
+                SqlBracketRoundState round = new SqlBracketRoundState
+                {
+                    RoundIndex = roundIndex,
+                    Stage = stage
+                };
+
+                foreach (DataRow match in matches.Rows.Cast<DataRow>().Where(row => AreEqual(row["StageID"], stage["StageID"])).OrderBy(row => ReadInt(row["MatchNumber"], 0)))
+                {
+                    round.Matches.Add(match);
+                }
+
+                if (round.Matches.Count > 0)
+                {
+                    rounds.Add(round);
+                }
+            }
+
+            return rounds;
+        }
+
+        private void PropagateBracketState(SqlConnection connection, SqlTransaction transaction, int tournamentId)
+        {
+            List<SqlBracketRoundState> rounds = GetGeneratedBracketRounds(tournamentId, connection, transaction);
+            PropagateBracketState(rounds);
+            PersistBracketMatches(connection, transaction, rounds);
+        }
+
+        private static void PropagateBracketState(List<SqlBracketRoundState> rounds)
+        {
+            for (int roundIndex = 1; roundIndex < rounds.Count; roundIndex++)
+            {
+                List<DataRow> previousRoundMatches = rounds[roundIndex - 1].Matches;
+                List<DataRow> currentRoundMatches = rounds[roundIndex].Matches;
+                for (int matchIndex = 0; matchIndex < currentRoundMatches.Count; matchIndex++)
+                {
+                    int? team1Id = matchIndex * 2 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2]) : (int?)null;
+                    int? team2Id = matchIndex * 2 + 1 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2 + 1]) : (int?)null;
+                    ApplyPropagatedTeams(currentRoundMatches[matchIndex], team1Id, team2Id);
+                }
+            }
+        }
+
+        private void PersistBracketMatches(SqlConnection connection, SqlTransaction transaction, IEnumerable<SqlBracketRoundState> rounds)
+        {
+            foreach (SqlBracketRoundState round in rounds)
+            {
+                foreach (DataRow match in round.Matches)
+                {
+                    ExecuteNonQuery(connection, transaction, @"UPDATE [dbo].[Matches]
+SET [Team1ID] = @Team1ID,
+    [Team2ID] = @Team2ID,
+    [WinnerTeamID] = @WinnerTeamID,
+    [Team1Score] = @Team1Score,
+    [Team2Score] = @Team2Score,
+    [MatchDate] = @MatchDate,
+    [BestOf] = @BestOf,
+    [Status] = @Status
+WHERE [MatchID] = @MatchID", command =>
+                    {
+                        AddParameter(command, "@Team1ID", ToNullableInt(match["Team1ID"]));
+                        AddParameter(command, "@Team2ID", ToNullableInt(match["Team2ID"]));
+                        AddParameter(command, "@WinnerTeamID", ToNullableInt(match["WinnerTeamID"]));
+                        AddParameter(command, "@Team1Score", ReadInt(match["Team1Score"], 0));
+                        AddParameter(command, "@Team2Score", ReadInt(match["Team2Score"], 0));
+                        AddParameter(command, "@MatchDate", NormalizeDateValue(match["MatchDate"]));
+                        AddParameter(command, "@BestOf", ReadInt(match["BestOf"], 3));
+                        AddParameter(command, "@Status", Convert.ToString(match["Status"]));
+                        AddParameter(command, "@MatchID", ReadInt(match["MatchID"], 0));
+                    });
+                }
+            }
+        }
+
+        private static void ApplyPropagatedTeams(DataRow match, int? team1Id, int? team2Id)
+        {
+            int? currentTeam1Id = ToNullableInt(match["Team1ID"]);
+            int? currentTeam2Id = ToNullableInt(match["Team2ID"]);
+            bool changed = currentTeam1Id != team1Id || currentTeam2Id != team2Id;
+            match["Team1ID"] = team1Id.HasValue ? (object)team1Id.Value : DBNull.Value;
+            match["Team2ID"] = team2Id.HasValue ? (object)team2Id.Value : DBNull.Value;
+
+            if (changed)
+            {
+                match["WinnerTeamID"] = DBNull.Value;
+                match["Team1Score"] = 0;
+                match["Team2Score"] = 0;
+                match["Status"] = "Scheduled";
+                return;
+            }
+
+            if (!HasCompatibleWinner(match, team1Id, team2Id))
+            {
+                match["WinnerTeamID"] = DBNull.Value;
+            }
+        }
+
+        private static int? ResolveAdvancingTeamId(DataRow sourceMatch)
+        {
+            int? team1Id = ToNullableInt(sourceMatch["Team1ID"]);
+            int? team2Id = ToNullableInt(sourceMatch["Team2ID"]);
+            int? winnerTeamId = ToNullableInt(sourceMatch["WinnerTeamID"]);
+            if (winnerTeamId.HasValue && (winnerTeamId == team1Id || winnerTeamId == team2Id))
+            {
+                return winnerTeamId;
+            }
+
+            if (team1Id.HasValue && !team2Id.HasValue)
+            {
+                return team1Id;
+            }
+
+            if (team2Id.HasValue && !team1Id.HasValue)
+            {
+                return team2Id;
+            }
+
+            string status = Convert.ToString(sourceMatch["Status"]);
+            int team1Score = ReadInt(sourceMatch["Team1Score"], 0);
+            int team2Score = ReadInt(sourceMatch["Team2Score"], 0);
+            if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) && team1Id.HasValue && team2Id.HasValue && team1Score != team2Score)
+            {
+                return team1Score > team2Score ? team1Id : team2Id;
+            }
+
+            return null;
+        }
+
+        private static bool HasCompatibleWinner(DataRow match, int? team1Id, int? team2Id)
+        {
+            int? winnerTeamId = ToNullableInt(match["WinnerTeamID"]);
+            return !winnerTeamId.HasValue || winnerTeamId == team1Id || winnerTeamId == team2Id;
+        }
+
+        private static int? NormalizeBracketTeamId(int? teamId, ICollection<int> availableTeams)
+        {
+            if (!teamId.HasValue)
+            {
+                return null;
+            }
+
+            if (!availableTeams.Contains(teamId.Value))
+            {
+                throw new InvalidOperationException("В сетке можно использовать только команды-участницы выбранного турнира.");
+            }
+
+            return teamId;
+        }
+
+        private static int? NormalizeWinnerTeamId(int? winnerTeamId, int? team1Id, int? team2Id, string status, int team1Score, int team2Score)
+        {
+            if (winnerTeamId.HasValue)
+            {
+                if (winnerTeamId != team1Id && winnerTeamId != team2Id)
+                {
+                    throw new InvalidOperationException("Победитель должен совпадать с одной из команд матча.");
+                }
+
+                return winnerTeamId;
+            }
+
+            if (team1Id.HasValue && !team2Id.HasValue)
+            {
+                return team1Id;
+            }
+
+            if (team2Id.HasValue && !team1Id.HasValue)
+            {
+                return team2Id;
+            }
+
+            if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) && team1Id.HasValue && team2Id.HasValue && team1Score != team2Score)
+            {
+                return team1Score > team2Score ? team1Id : team2Id;
+            }
+
+            return null;
+        }
+
+        private static object NormalizeDateValue(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return DBNull.Value;
+            }
+
+            return value is DateTime dateTime ? (object)dateTime : Convert.ToDateTime(value);
+        }
+
+        private static bool IsBracketStage(DataRow row)
+        {
+            string stageName = Convert.ToString(row["StageName"]);
+            int stageOrder = ReadInt(row["StageOrder"], 0);
+            return stageOrder >= 100 || stageName.StartsWith("Bracket - ", StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        private static int ReadInt(object value, int fallback)
+        {
+            return value == null || value == DBNull.Value ? fallback : Convert.ToInt32(value);
+        }
+
+        private static int? ToNullableInt(object value)
+        {
+            return value == null || value == DBNull.Value ? (int?)null : Convert.ToInt32(value);
+        }
+
+        private static int NextPowerOfTwo(int value)
+        {
+            int result = 2;
+            while (result < value)
+            {
+                result *= 2;
+            }
+
+            return result;
+        }
+
+        private static int[] BuildSeedPositions(int size)
+        {
+            List<int> positions = new List<int> { 1, 2 };
+            while (positions.Count < size)
+            {
+                int nextSize = positions.Count * 2 + 1;
+                List<int> expanded = new List<int>();
+                foreach (int position in positions)
+                {
+                    expanded.Add(position);
+                    expanded.Add(nextSize - position);
+                }
+
+                positions = expanded;
+            }
+
+            return positions.ToArray();
+        }
+
+        private static string GetRoundTitle(int teamsInRound)
+        {
+            switch (teamsInRound)
+            {
+                case 2: return "Grand Final";
+                case 4: return "Semifinals";
+                case 8: return "Quarterfinals";
+                case 16: return "Round of 16";
+                case 32: return "Round of 32";
+                default: return "Round of " + teamsInRound;
+            }
+        }
+
+        private static string EscapeIdentifier(string identifier)
+        {
+            if (string.IsNullOrWhiteSpace(identifier))
+            {
+                throw new InvalidOperationException("Имя таблицы или столбца не может быть пустым.");
+            }
+
+            foreach (char symbol in identifier)
+            {
+                if (!char.IsLetterOrDigit(symbol) && symbol != '_')
+                {
+                    throw new InvalidOperationException("Недопустимое имя таблицы или столбца: " + identifier);
+                }
+            }
+
+            return identifier;
+        }
+
+        private static bool ContainsColumn(IReadOnlyCollection<string> columns, string columnName)
+        {
+            return columns.Any(column => string.Equals(column, columnName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void AddParameter(SqlCommand command, string parameterName, object value)
+        {
+            command.Parameters.AddWithValue(parameterName, value ?? DBNull.Value);
+        }
+
+        private static bool AreEqual(object left, object right)
+        {
+            if (left == DBNull.Value) left = null;
+            if (right == DBNull.Value) right = null;
+            if (left == null && right == null) return true;
+            if (left == null || right == null) return false;
+            if (left is string || right is string) return string.Equals(Convert.ToString(left), Convert.ToString(right), StringComparison.CurrentCultureIgnoreCase);
+            if (left is DateTime || right is DateTime) return Convert.ToDateTime(left).Date == Convert.ToDateTime(right).Date;
+            if (left is bool || right is bool) return Convert.ToBoolean(left) == Convert.ToBoolean(right);
+            if (left is decimal || right is decimal || left is double || right is double || left is float || right is float) return Convert.ToDecimal(left) == Convert.ToDecimal(right);
+            return Convert.ToInt64(left) == Convert.ToInt64(right);
+        }
+
+        private sealed class SqlBracketRoundState
+        {
+            public int RoundIndex { get; set; }
+
+            public DataRow Stage { get; set; }
+
+            public List<DataRow> Matches { get; } = new List<DataRow>();
+        }
+    }
+}

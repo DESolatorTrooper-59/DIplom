@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Data;
@@ -13,7 +13,6 @@ using System.Globalization;
 using static System.Net.Mime.MediaTypeNames;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Microsoft.Office.Interop.Word;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 namespace Tournaments
@@ -497,12 +496,17 @@ namespace Tournaments
         {
             try
             {
-                Microsoft.Office.Interop.Excel._Application app = new Microsoft.Office.Interop.Excel.Application();
-                Microsoft.Office.Interop.Excel._Workbook workbook = app.Workbooks.Add(Type.Missing);
-                Microsoft.Office.Interop.Excel._Worksheet worksheet = null;
+                Type excelType = Type.GetTypeFromProgID("Excel.Application");
+                if (excelType == null)
+                {
+                    MessageBox.Show("Microsoft Excel не установлен на этом компьютере.");
+                    return;
+                }
+
+                dynamic app = Activator.CreateInstance(excelType);
+                dynamic workbook = app.Workbooks.Add(Type.Missing);
                 app.Visible = true;
-                worksheet = workbook.Sheets["Sheet1"];
-                worksheet = workbook.ActiveSheet;
+                dynamic worksheet = workbook.ActiveSheet;
                 for (int i = 1; i < dataGridView1.Columns.Count + 1; i++)
                 {
                     worksheet.Cells[1, i] = dataGridView1.Columns[i - 1].HeaderText;
@@ -522,9 +526,9 @@ namespace Tournaments
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                MessageBox.Show("нее хватает прав для создания файла");
+                MessageBox.Show("Не удалось экспортировать данные в Excel: " + ex.Message);
             }
 
         }
@@ -556,58 +560,78 @@ namespace Tournaments
 
         public static void ExportDataGridViewToWord(DataGridView dataGridView, string tableName)
         {
-            // Создаем экземпляр Word
-            var wordApp = new Microsoft.Office.Interop.Word.Application();
-            wordApp.Visible = true; // Делаем Word видимым
+            object wordTable = null;
+            object document = null;
+            object wordApp = null;
 
-            // Создаем новый документ
-            var document = wordApp.Documents.Add();
-
-            // Добавляем заголовок таблицы
-            var paragraph = document.Paragraphs.Add();
-            paragraph.Range.Text = tableName;
-            paragraph.Range.Font.Bold = 1;
-            paragraph.Range.Font.Size = 14;
-            paragraph.Format.SpaceAfter = 24; // Отступ после заголовка
-            paragraph.Range.InsertParagraphAfter();
-
-            // Создаем таблицу в Word (строки + 1 для заголовков, столбцы как в DataGridView)
-            var wordTable = document.Tables.Add(
-                paragraph.Range,
-                dataGridView.Rows.Count + 1,
-                dataGridView.Columns.Count);
-
-            // Заполняем заголовки таблицы
-            for (int i = 0; i < dataGridView.Columns.Count; i++)
+            try
             {
-                wordTable.Cell(1, i + 1).Range.Text = dataGridView.Columns[i].HeaderText;
-                wordTable.Cell(1, i + 1).Range.Font.Bold = 1; // Жирный шрифт для заголовков
-            }
-
-            // Заполняем данные таблицы
-            for (int i = 0; i < dataGridView.Rows.Count; i++)
-            {
-                for (int j = 0; j < dataGridView.Columns.Count; j++)
+                Type wordType = Type.GetTypeFromProgID("Word.Application");
+                if (wordType == null)
                 {
-                    if (dataGridView.Rows[i].Cells[j].Value != null)
+                    MessageBox.Show("Microsoft Word не установлен на этом компьютере.");
+                    return;
+                }
+
+                dynamic app = Activator.CreateInstance(wordType);
+                wordApp = app;
+                app.Visible = true;
+
+                dynamic doc = app.Documents.Add();
+                document = doc;
+
+                dynamic paragraph = doc.Paragraphs.Add();
+                paragraph.Range.Text = tableName;
+                paragraph.Range.Font.Bold = 1;
+                paragraph.Range.Font.Size = 14;
+                paragraph.Format.SpaceAfter = 24;
+                paragraph.Range.InsertParagraphAfter();
+
+                int dataRowCount = dataGridView.AllowUserToAddRows
+                    ? Math.Max(0, dataGridView.Rows.Count - 1)
+                    : dataGridView.Rows.Count;
+
+                dynamic table = doc.Tables.Add(paragraph.Range, dataRowCount + 1, dataGridView.Columns.Count);
+                wordTable = table;
+
+                for (int i = 0; i < dataGridView.Columns.Count; i++)
+                {
+                    table.Cell(1, i + 1).Range.Text = dataGridView.Columns[i].HeaderText;
+                    table.Cell(1, i + 1).Range.Font.Bold = 1;
+                }
+
+                for (int i = 0; i < dataRowCount; i++)
+                {
+                    for (int j = 0; j < dataGridView.Columns.Count; j++)
                     {
-                        wordTable.Cell(i + 2, j + 1).Range.Text = dataGridView.Rows[i].Cells[j].Value.ToString();
+                        if (dataGridView.Rows[i].Cells[j].Value != null)
+                        {
+                            table.Cell(i + 2, j + 1).Range.Text = dataGridView.Rows[i].Cells[j].Value.ToString();
+                        }
                     }
                 }
+
+                table.Borders.Enable = 1;
+                table.AutoFitBehavior(1);
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось экспортировать данные в Word: " + ex.Message);
+            }
+            finally
+            {
+                ReleaseComObjectSafe(wordTable);
+                ReleaseComObjectSafe(document);
+                ReleaseComObjectSafe(wordApp);
+            }
+        }
 
-            // Применяем автоформатирование таблицы (опционально)
-            wordTable.Borders.Enable = 1;
-            wordTable.AutoFitBehavior(WdAutoFitBehavior.wdAutoFitContent);
-
-            // Сохраняем документ (опционально)
-            // document.SaveAs2(@"C:\Export.docx");
-
-            // Освобождаем ресурсы (но оставляем Word открытым)
-            System.Runtime.InteropServices.Marshal.ReleaseComObject(wordTable);
-            System.Runtime.InteropServices.Marshal.ReleaseComObject(document);
-            System.Runtime.InteropServices.Marshal.ReleaseComObject(wordApp);
+        private static void ReleaseComObjectSafe(object comObject)
+        {
+            if (comObject != null && System.Runtime.InteropServices.Marshal.IsComObject(comObject))
+            {
+                System.Runtime.InteropServices.Marshal.ReleaseComObject(comObject);
+            }
         }
     }
 }
-

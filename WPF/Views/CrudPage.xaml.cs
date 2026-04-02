@@ -306,6 +306,7 @@ namespace Tournaments.WPF.Views
             FieldDefinition field = _definition.Fields.FirstOrDefault(item => item.Name == e.PropertyName);
             if (field == null)
             {
+                e.Cancel = true;
                 return;
             }
 
@@ -871,3 +872,4 @@ namespace Tournaments.WPF.Views
         }
     }
 }
+

@@ -10,9 +10,10 @@ namespace Tournaments.WPF.Views
 {
     public partial class LoginWindow : Window
     {
-        private readonly DatabaseService _database;
+        private readonly DatabaseService _testDatabase;
+        private DatabaseService _database;
+        private DatabaseService _sqlDatabase;
         private readonly SqlServerConnectionService _sqlConnectionService;
-        private bool _isSqlMode;
         private bool _isConnecting;
 
         public LoginWindow()
@@ -20,20 +21,28 @@ namespace Tournaments.WPF.Views
             InitializeComponent();
             Loaded += LoginWindow_Loaded;
             _sqlConnectionService = SqlServerConnectionService.Instance;
+            SwitchMode(false);
 
             try
             {
-                _database = new DatabaseService();
-                _database.EnsureOrganizerUser("admin", "password");
-                SetLoginMessage(null);
+                _testDatabase = DatabaseService.CreateInMemory();
+                _testDatabase.EnsureOrganizerUser("admin", "password");
+                ActivateTestMode(true);
+                if (_sqlConnectionService.HasSuccessfulConnection)
+                {
+                    TryRestoreSqlMode();
+                }
+                else
+                {
+                    UpdateConnectionIndicator(false);
+                }
             }
             catch (Exception ex)
             {
                 SetLoginMessage("Не удалось инициализировать внутреннее хранилище: " + ex.Message);
+                UpdateConnectionIndicator(false);
+                UpdateTestModeIndicator(false);
             }
-
-            SwitchMode(false);
-            UpdateConnectionIndicator(false);
         }
 
         private void LoginWindow_Loaded(object sender, RoutedEventArgs e)
@@ -53,7 +62,6 @@ namespace Tournaments.WPF.Views
 
             string login = LoginTextBox.Text.Trim();
             string password = PasswordTextBox.Password;
-
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             {
                 SetLoginMessage("Введите логин и пароль.");
@@ -70,6 +78,19 @@ namespace Tournaments.WPF.Views
             Application.Current.MainWindow = window;
             window.Show();
             Close();
+        }
+
+        private void TestModeButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isConnecting)
+            {
+                return;
+            }
+
+            SetSqlMessage(null);
+            SwitchMode(false);
+            ActivateTestMode(true);
+            LoginTextBox.Focus();
         }
 
         private void SqlModeButton_Click(object sender, RoutedEventArgs e)
@@ -98,6 +119,7 @@ namespace Tournaments.WPF.Views
             }
 
             SetSqlMessage(null);
+            SetLoginMessage(null);
             SqlServerConnectionSettings settings = new SqlServerConnectionSettings
             {
                 Server = SqlServerTextBox.Text.Trim(),
@@ -109,19 +131,28 @@ namespace Tournaments.WPF.Views
 
             try
             {
+                DatabaseService sqlDatabase = null;
                 SetConnectingState(true);
-                await Task.Run(() => _sqlConnectionService.Connect(settings));
-                UpdateConnectionIndicator(true);
-                SetLoginMessage(BuildConnectedMessage(), false);
+                await Task.Run(() =>
+                {
+                    _sqlConnectionService.Connect(settings);
+                    sqlDatabase = DatabaseService.CreateSqlServer(_sqlConnectionService.ActiveConnectionString, _sqlConnectionService.ActiveConnectionLabel);
+                    sqlDatabase.ValidateCompatibility();
+                });
+
+                ActivateSqlDatabase(sqlDatabase, true);
                 SetSqlMessage(null);
                 SwitchMode(false);
                 LoginTextBox.Focus();
             }
             catch (Exception ex)
             {
+                _sqlDatabase = null;
                 _sqlConnectionService.ClearSuccessfulConnection();
                 UpdateConnectionIndicator(false);
+                ActivateTestMode(false);
                 SetSqlMessage("Не удалось подключиться к MS SQL Server: " + ex.Message, true);
+                SetLoginMessage(BuildTestModeMessage(), false);
             }
             finally
             {
@@ -181,7 +212,6 @@ namespace Tournaments.WPF.Views
 
         private void SwitchMode(bool isSqlMode)
         {
-            _isSqlMode = isSqlMode;
             LoginModeGrid.Visibility = isSqlMode ? Visibility.Collapsed : Visibility.Visible;
             SqlModeGrid.Visibility = isSqlMode ? Visibility.Visible : Visibility.Collapsed;
             TitleText.Text = isSqlMode ? "MS SQL Server" : "Tournaments WPF";
@@ -197,6 +227,7 @@ namespace Tournaments.WPF.Views
             ConnectSqlButton.IsEnabled = !isConnecting;
             SqlModeButton.IsEnabled = !isConnecting;
             LoginButton.IsEnabled = !isConnecting;
+            TestModeButton.IsEnabled = !isConnecting;
             WindowsAuthCheckBox.IsEnabled = !isConnecting;
             SqlServerTextBox.IsEnabled = !isConnecting;
             SqlDatabaseTextBox.IsEnabled = !isConnecting;
@@ -205,6 +236,57 @@ namespace Tournaments.WPF.Views
             {
                 SqlUserTextBox.IsEnabled = false;
                 SqlPasswordTextBox.IsEnabled = false;
+            }
+        }
+
+        private void TryRestoreSqlMode()
+        {
+            try
+            {
+                DatabaseService sqlDatabase = DatabaseService.CreateSqlServer(_sqlConnectionService.ActiveConnectionString, _sqlConnectionService.ActiveConnectionLabel);
+                sqlDatabase.ValidateCompatibility();
+                ActivateSqlDatabase(sqlDatabase, false);
+                SetLoginMessage(BuildConnectedMessage(), false);
+            }
+            catch
+            {
+                _sqlDatabase = null;
+                _sqlConnectionService.ClearSuccessfulConnection();
+                UpdateConnectionIndicator(false);
+                ActivateTestMode(false);
+            }
+        }
+
+        private void ActivateTestMode(bool showMessage)
+        {
+            if (_testDatabase == null)
+            {
+                UpdateTestModeIndicator(false);
+                return;
+            }
+
+            _database = _testDatabase;
+            UpdateTestModeIndicator(true);
+            if (!_sqlConnectionService.HasSuccessfulConnection)
+            {
+                UpdateConnectionIndicator(false);
+            }
+
+            if (showMessage)
+            {
+                SetLoginMessage(BuildTestModeMessage(), false);
+            }
+        }
+
+        private void ActivateSqlDatabase(DatabaseService sqlDatabase, bool showMessage)
+        {
+            _sqlDatabase = sqlDatabase ?? throw new ArgumentNullException(nameof(sqlDatabase));
+            _database = _sqlDatabase;
+            UpdateConnectionIndicator(true);
+            UpdateTestModeIndicator(false);
+            if (showMessage)
+            {
+                SetLoginMessage(BuildConnectedMessage(), false);
             }
         }
 
@@ -225,16 +307,38 @@ namespace Tournaments.WPF.Views
             PlugPinBottom.Fill = solidBrush;
             PlugCable.Stroke = solidBrush;
             PlugTransform.X = isConnected ? 0 : 8;
-            DbStatusBadge.ToolTip = isConnected
-                ? "Соединение с MS SQL Server установлено."
-                : "Подключение к MS SQL Server не установлено.";
+            DbStatusBadge.ToolTip = isConnected ? "Соединение с MS SQL Server установлено." : "Подключение к MS SQL Server не установлено.";
+        }
+
+        private void UpdateTestModeIndicator(bool isActive)
+        {
+            Color accent = isActive ? Color.FromRgb(99, 163, 171) : Color.FromRgb(148, 163, 184);
+            TestModeBadge.BorderBrush = new SolidColorBrush(accent);
+            TestModeBadge.Background = new SolidColorBrush(Color.FromArgb(isActive ? (byte)56 : (byte)24, accent.R, accent.G, accent.B));
+            SolidColorBrush iconBrush = new SolidColorBrush(accent);
+
+            RobotHead.Stroke = iconBrush;
+            RobotAntenna.Stroke = iconBrush;
+            RobotArmLeft.Stroke = iconBrush;
+            RobotArmRight.Stroke = iconBrush;
+            RobotHead.Fill = new SolidColorBrush(Color.FromArgb(36, accent.R, accent.G, accent.B));
+            RobotAntennaTip.Fill = iconBrush;
+            RobotEyeLeft.Fill = iconBrush;
+            RobotEyeRight.Fill = iconBrush;
+            RobotMouth.Fill = iconBrush;
+            TestModeButton.ToolTip = isActive ? "Активен тестовый режим." : "Переключиться на тестовый режим.";
         }
 
         private string BuildConnectedMessage()
         {
             return string.IsNullOrWhiteSpace(_sqlConnectionService.ActiveConnectionLabel)
-                ? "Соединение с MS SQL Server успешно установлено."
-                : "Соединение с MS SQL Server успешно установлено: " + _sqlConnectionService.ActiveConnectionLabel + ".";
+                ? "Активен режим MS SQL Server. Вход и данные приложения используют подключённую базу данных."
+                : "Активен режим MS SQL Server: " + _sqlConnectionService.ActiveConnectionLabel + ".";
+        }
+
+        private static string BuildTestModeMessage()
+        {
+            return "Активен тестовый режим. Для демонстрационной версии можно войти как admin / password.";
         }
 
         private void SetLoginMessage(string message, bool isError = true)

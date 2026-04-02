@@ -1,67 +1,151 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Linq;
 using Tournaments.WPF.Models;
 
 namespace Tournaments.WPF.Services
 {
     public sealed class DatabaseService
     {
-        private readonly InMemoryDataStore _store;
+        private readonly IDataBackend _backend;
+        private readonly Dictionary<string, IReadOnlyCollection<string>> _columnsCache = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
 
-        public DatabaseService()
-            : this(InMemoryDataStore.Instance)
+        private DatabaseService(IDataBackend backend)
         {
+            _backend = backend ?? throw new ArgumentNullException(nameof(backend));
         }
 
-        internal DatabaseService(InMemoryDataStore store)
+        public static DatabaseService CreateInMemory()
         {
-            _store = store ?? throw new ArgumentNullException(nameof(store));
+            return new DatabaseService(new InMemoryDataBackend(InMemoryDataStore.Instance));
         }
+
+        public static DatabaseService CreateSqlServer(string connectionString, string storageLabel)
+        {
+            return new DatabaseService(new SqlServerDataBackend(connectionString, storageLabel));
+        }
+
+        internal static DatabaseService CreateSnapshot(IDictionary<string, DataTable> tables)
+        {
+            return new DatabaseService(new SnapshotDataBackend(tables));
+        }
+
+        public string ModeTitle => _backend.ModeTitle;
+
+        public string StorageLabel => _backend.StorageLabel;
+
+        public bool IsTestMode => _backend.IsTestMode;
 
         public DataTable GetTable(string tableName)
         {
-            return _store.GetTableCopy(tableName);
+            return _backend.GetTable(tableName);
         }
 
         public bool ValidateLogin(string login, string password)
         {
-            return _store.ValidateUser(login, password);
+            return _backend.ValidateLogin(login, password);
         }
 
         public void EnsureOrganizerUser(string login, string password)
         {
-            _store.EnsureUser(login, password);
+            _backend.EnsureOrganizerUser(login, password);
         }
 
         public bool RecordExists(string tableName, string columnName, object value)
         {
-            return _store.RecordExists(tableName, columnName, value);
+            return _backend.RecordExists(tableName, columnName, value);
         }
 
         public int CountRows(string tableName, Func<DataRow, bool> predicate)
         {
-            return _store.CountRows(tableName, predicate);
+            return _backend.CountRows(tableName, predicate);
         }
 
         public int? PeekNextIdentityValue(string tableName)
         {
-            return _store.PeekNextIdentityValue(tableName);
+            return _backend.PeekNextIdentityValue(tableName);
         }
 
         public void Insert(string tableName, IDictionary<string, object> values)
         {
-            _store.Insert(tableName, values);
+            _backend.Insert(tableName, values);
         }
 
         public void Update(string tableName, string[] keyColumns, IDictionary<string, object> values, IDictionary<string, object> originalValues)
         {
-            _store.Update(tableName, keyColumns, values, originalValues);
+            _backend.Update(tableName, keyColumns, values, originalValues);
         }
 
         public void Delete(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
         {
-            _store.Delete(tableName, keyColumns, originalValues);
+            _backend.Delete(tableName, keyColumns, originalValues);
+        }
+
+        public EntityDefinition GetEffectiveDefinition(EntityDefinition definition)
+        {
+            if (definition == null)
+            {
+                throw new ArgumentNullException(nameof(definition));
+            }
+
+            IReadOnlyCollection<string> columns = GetAvailableColumns(definition.TableName);
+            FieldDefinition[] fields = definition.Fields
+                .Where(field => ContainsColumn(columns, field.Name))
+                .ToArray();
+            string[] keyColumns = definition.KeyColumns
+                .Where(keyColumn => ContainsColumn(columns, keyColumn))
+                .ToArray();
+
+            EntityDefinition effectiveDefinition = new EntityDefinition(definition.TableName, definition.Title, keyColumns, fields);
+            effectiveDefinition.SaveValidator = definition.SaveValidator;
+            effectiveDefinition.DeleteValidator = definition.DeleteValidator;
+            return effectiveDefinition;
+        }
+
+        public IReadOnlyList<EntityDefinition> GetEffectiveDefinitions()
+        {
+            return EntityRegistry.All
+                .Select(GetEffectiveDefinition)
+                .ToList();
+        }
+
+        public IReadOnlyCollection<string> GetAvailableColumns(string tableName)
+        {
+            if (_columnsCache.TryGetValue(tableName, out IReadOnlyCollection<string> cachedColumns))
+            {
+                return cachedColumns;
+            }
+
+            IReadOnlyCollection<string> columns = _backend.GetColumns(tableName);
+            _columnsCache[tableName] = columns;
+            return columns;
+        }
+
+        public void ValidateCompatibility()
+        {
+            if (IsTestMode)
+            {
+                return;
+            }
+
+            ValidateRequiredColumns("Organizer", "Login", "Password");
+            foreach (EntityDefinition definition in EntityRegistry.All)
+            {
+                IReadOnlyCollection<string> columns = GetAvailableColumns(definition.TableName);
+                foreach (string keyColumn in definition.KeyColumns)
+                {
+                    if (!ContainsColumn(columns, keyColumn))
+                    {
+                        throw new InvalidOperationException("В таблице \"" + definition.TableName + "\" отсутствует ключевой столбец \"" + keyColumn + "\".");
+                    }
+                }
+
+                if (!definition.Fields.Any(field => ContainsColumn(columns, field.Name)))
+                {
+                    throw new InvalidOperationException("Таблица \"" + definition.TableName + "\" не содержит ни одного поддерживаемого столбца для WPF-клиента.");
+                }
+            }
         }
 
         public void ReplaceTableValidated(EntityDefinition definition, DataTable importedTable)
@@ -76,23 +160,45 @@ namespace Tournaments.WPF.Services
                 throw new ArgumentNullException(nameof(importedTable));
             }
 
-            InMemoryDataStore snapshot = _store.CloneStore();
-            snapshot.ReplaceTableContents(definition.TableName, importedTable);
+            EntityDefinition effectiveDefinition = GetEffectiveDefinition(definition);
+            Dictionary<string, DataTable> snapshotTables = GetEffectiveDefinitions()
+                .ToDictionary(item => item.TableName, item => GetTable(item.TableName), StringComparer.OrdinalIgnoreCase);
 
-            DatabaseService validationDatabase = new DatabaseService(snapshot);
-            SnapshotValidationService.Validate(EntityRegistry.All, validationDatabase);
+            DataTable importedCopy = importedTable.Copy();
+            importedCopy.TableName = effectiveDefinition.TableName;
+            snapshotTables[effectiveDefinition.TableName] = importedCopy;
 
-            _store.ReplaceTableContents(definition.TableName, importedTable);
+            DatabaseService validationDatabase = CreateSnapshot(snapshotTables);
+            SnapshotValidationService.Validate(validationDatabase.GetEffectiveDefinitions(), validationDatabase);
+
+            _backend.ReplaceTableContents(effectiveDefinition.TableName, importedTable);
         }
 
         public int GenerateTournamentBracket(int tournamentId)
         {
-            return _store.GenerateTournamentBracket(tournamentId);
+            return _backend.GenerateTournamentBracket(tournamentId);
         }
 
         public void UpdateBracketMatch(int tournamentId, BracketMatchUpdateRequest request)
         {
-            _store.UpdateBracketMatch(tournamentId, request);
+            _backend.UpdateBracketMatch(tournamentId, request);
+        }
+
+        private void ValidateRequiredColumns(string tableName, params string[] columns)
+        {
+            IReadOnlyCollection<string> availableColumns = GetAvailableColumns(tableName);
+            foreach (string column in columns)
+            {
+                if (!ContainsColumn(availableColumns, column))
+                {
+                    throw new InvalidOperationException("В таблице \"" + tableName + "\" отсутствует обязательный столбец \"" + column + "\".");
+                }
+            }
+        }
+
+        private static bool ContainsColumn(IReadOnlyCollection<string> columns, string columnName)
+        {
+            return columns.Any(column => string.Equals(column, columnName, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

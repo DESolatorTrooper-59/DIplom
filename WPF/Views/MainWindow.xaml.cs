@@ -24,7 +24,7 @@ namespace Tournaments.WPF.Views
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            UserText.Text = "Организатор: " + _login + "\nХранилище: singleton Dictionary (in-memory)";
+            UserText.Text = "Организатор: " + _login + "\nРежим: " + _database.ModeTitle + "\nХранилище: " + _database.StorageLabel;
             EntitiesList.ItemsSource = BuildNavigationItems();
             EntitiesList.DisplayMemberPath = "Title";
             if (EntitiesList.Items.Count > 0)
@@ -49,7 +49,7 @@ namespace Tournaments.WPF.Views
 
             if (item.EntityDefinition != null)
             {
-                PageHost.Content = new CrudPage(_database, _crud, item.EntityDefinition, _login);
+                PageHost.Content = new CrudPage(_database, _crud, _database.GetEffectiveDefinition(item.EntityDefinition), _login);
             }
         }
 
@@ -73,4 +73,3 @@ namespace Tournaments.WPF.Views
         }
     }
 }
-
