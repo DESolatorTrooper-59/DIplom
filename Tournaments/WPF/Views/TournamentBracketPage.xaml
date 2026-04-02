@@ -1,0 +1,192 @@
+<UserControl x:Class="Tournaments.WPF.Views.TournamentBracketPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,16">
+      <TextBlock Text="Турнирная сетка" FontSize="28" FontWeight="Bold" Foreground="#FF102A43" />
+      <TextBlock Text="Просмотр и редактирование сетки по раундам: выберите матч, измените счет, статус и параметры встречи."
+                 Foreground="#FF486581"
+                 Margin="0,6,0,0"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Padding="16" Background="White" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="14">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Турнир" />
+          <ComboBox Grid.Column="1"
+                    x:Name="TournamentComboBox"
+                    Height="38"
+                    Margin="12,0,16,0"
+                    VerticalAlignment="Center"
+                    SelectionChanged="TournamentComboBox_SelectionChanged" />
+          <Button Grid.Column="2" Width="150" Height="38" VerticalAlignment="Center" Content="Показать сетку" Click="Preview_Click" />
+          <Button Grid.Column="3" Width="150" Height="38" VerticalAlignment="Center" Content="Создать сетку" Click="Generate_Click" />
+          <Button Grid.Column="4" Width="140" Height="38" VerticalAlignment="Center" Content="Обновить" Style="{StaticResource GhostButtonStyle}" Click="RefreshTournaments_Click" />
+        </Grid>
+
+        <TextBlock Grid.Row="1"
+                   x:Name="SummaryText"
+                   Margin="0,14,0,0"
+                   Foreground="#FF486581"
+                   TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" Margin="0,16,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="320" />
+        <ColumnDefinition Width="16" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Padding="16" Background="White" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="14">
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+
+          <TextBlock Text="Участники" FontSize="18" FontWeight="SemiBold" Foreground="#FF102A43" />
+
+          <ListBox Grid.Row="1" x:Name="ParticipantsList" Margin="0,14,0,0" BorderThickness="0" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Margin="0,0,0,10" Padding="12" Background="#FFF7FAFC" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="10">
+                  <StackPanel>
+                    <TextBlock Text="{Binding TeamName}" FontWeight="SemiBold" Foreground="#FF102A43" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Country}" Margin="0,4,0,0" Foreground="#FF486581" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Column="2">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="16" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="16" Background="White" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="14">
+          <Grid>
+            <TextBlock x:Name="EmptyStateText"
+                       Foreground="#FF486581"
+                       FontSize="16"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       TextAlignment="Center"
+                       Visibility="Collapsed" />
+
+            <ScrollViewer x:Name="BracketScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+              <Canvas x:Name="BracketCanvas" Background="#FFF4F4FB" />
+            </ScrollViewer>
+          </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Padding="16" Background="White" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="14">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel>
+                <TextBlock Text="Редактирование матча" FontSize="20" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <TextBlock x:Name="EditorStateText"
+                           Margin="0,6,0,0"
+                           Foreground="#FF486581"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+
+              <Border Grid.Column="1" Padding="10,6" Background="#FFF7FAFC" BorderBrush="#FFD9E2EC" BorderThickness="1" CornerRadius="10" VerticalAlignment="Top">
+                <TextBlock x:Name="EditorSelectionText" FontWeight="SemiBold" Foreground="#FF102A43" />
+              </Border>
+            </Grid>
+
+            <TextBlock Grid.Row="1"
+                       x:Name="TeamEditHintText"
+                       Margin="0,12,0,0"
+                       Foreground="#FF486581"
+                       TextWrapping="Wrap" />
+
+            <Grid Grid.Row="2" x:Name="EditorFieldsGrid" Margin="0,16,0,0" IsEnabled="False">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Команда 1" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <ComboBox x:Name="Team1ComboBox" Height="38" Margin="0,8,0,0" SelectionChanged="TeamSelectionChanged" />
+                <TextBlock Text="Команда 2" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <ComboBox x:Name="Team2ComboBox" Height="38" Margin="0,8,0,0" SelectionChanged="TeamSelectionChanged" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Счет 1" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <TextBox x:Name="Team1ScoreTextBox" Height="38" Margin="0,8,0,0" />
+                <TextBlock Text="Счет 2" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <TextBox x:Name="Team2ScoreTextBox" Height="38" Margin="0,8,0,0" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="4">
+                <TextBlock Text="Победитель" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <ComboBox x:Name="WinnerComboBox" Height="38" Margin="0,8,0,0" />
+                <TextBlock Text="Статус" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <ComboBox x:Name="StatusComboBox" Height="38" Margin="0,8,0,0" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="6">
+                <TextBlock Text="Дата матча" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <DatePicker x:Name="MatchDatePicker" Height="38" Margin="0,8,0,0" SelectedDateFormat="Short" />
+                <TextBlock Text="Best Of" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <ComboBox x:Name="BestOfComboBox" Height="38" Margin="0,8,0,0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+                  <Button x:Name="CancelEditButton" Width="130" Height="38" Content="Отменить" Style="{StaticResource GhostButtonStyle}" Click="CancelEdit_Click" IsEnabled="False" />
+                  <Button x:Name="SaveMatchButton" Width="160" Height="38" Margin="12,0,0,0" Content="Сохранить матч" Click="SaveMatch_Click" IsEnabled="False" />
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </Grid>
+        </Border>
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

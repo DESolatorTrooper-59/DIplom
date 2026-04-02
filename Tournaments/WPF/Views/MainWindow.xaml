@@ -1,0 +1,72 @@
+<Window x:Class="Tournaments.WPF.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tournaments WPF"
+        Width="1440"
+        Height="860"
+        WindowStartupLocation="CenterScreen">
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="280" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+
+    <Border Grid.Column="0" Background="{StaticResource PanelBrush}">
+      <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Top">
+          <TextBlock Text="Tournament Control"
+                     Foreground="White"
+                     FontSize="24"
+                     FontWeight="Bold" />
+          <TextBlock x:Name="UserText"
+                     Margin="0,10,0,24"
+                     Foreground="#FFD9E2EC"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+
+        <Button DockPanel.Dock="Bottom"
+                Margin="0,16,0,0"
+                Content="Выйти"
+                Style="{StaticResource GhostButtonStyle}"
+                Click="Logout_Click" />
+
+        <ListBox x:Name="EntitiesList"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Foreground="White"
+                 SelectionChanged="EntitiesList_SelectionChanged">
+          <ListBox.ItemContainerStyle>
+            <Style TargetType="ListBoxItem">
+              <Setter Property="Margin" Value="0,0,0,8" />
+              <Setter Property="Padding" Value="14,10" />
+              <Setter Property="Background" Value="#00000000" />
+              <Setter Property="Template">
+                <Setter.Value>
+                  <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Root"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="10">
+                      <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                      <Trigger Property="IsSelected" Value="True">
+                        <Setter TargetName="Root" Property="Background" Value="#FF166088" />
+                      </Trigger>
+                      <Trigger Property="IsMouseOver" Value="True">
+                        <Setter TargetName="Root" Property="Background" Value="#223D5A80" />
+                      </Trigger>
+                    </ControlTemplate.Triggers>
+                  </ControlTemplate>
+                </Setter.Value>
+              </Setter>
+            </Style>
+          </ListBox.ItemContainerStyle>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <Grid Grid.Column="1" Margin="20">
+      <ContentControl x:Name="PageHost" />
+    </Grid>
+  </Grid>
+</Window>

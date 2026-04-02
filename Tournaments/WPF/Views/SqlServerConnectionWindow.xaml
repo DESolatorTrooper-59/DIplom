@@ -1,0 +1,86 @@
+<Window x:Class="Tournaments.WPF.Views.SqlServerConnectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Подключение к MS SQL Server"
+        Width="500"
+        Height="470"
+        MinWidth="500"
+        MinHeight="470"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Margin="24,24,24,12">
+      <TextBlock Text="Подключение к MS SQL Server"
+                 FontSize="24"
+                 FontWeight="Bold"
+                 Foreground="#FF102A43" />
+      <TextBlock Margin="0,8,0,0"
+                 Text="Укажите параметры сервера и проверьте соединение с базой данных."
+                 Foreground="#FF486581"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1" Margin="24,0,24,12" VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <TextBlock Text="Сервер" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <TextBox x:Name="ServerTextBox" Height="38" />
+
+        <TextBlock Text="База данных" FontWeight="SemiBold" Margin="0,6,0,6" />
+        <TextBox x:Name="DatabaseTextBox" Height="38" />
+
+        <CheckBox x:Name="WindowsAuthCheckBox"
+                  Content="Использовать Windows Authentication"
+                  Margin="0,8,0,8"
+                  Checked="WindowsAuthCheckBox_Changed"
+                  Unchecked="WindowsAuthCheckBox_Changed" />
+
+        <TextBlock Text="Логин SQL Server" FontWeight="SemiBold" Margin="0,0,0,6" />
+        <TextBox x:Name="UserNameTextBox" Height="38" />
+
+        <TextBlock Text="Пароль SQL Server" FontWeight="SemiBold" Margin="0,6,0,6" />
+        <PasswordBox x:Name="PasswordTextBox" Height="38" />
+
+        <Border x:Name="MessageContainer"
+                Margin="0,12,0,0"
+                Padding="12"
+                Background="#FFFEE4E2"
+                BorderBrush="#FFFECACA"
+                BorderThickness="1"
+                CornerRadius="10"
+                Visibility="Collapsed">
+          <TextBlock x:Name="MessageText"
+                     Foreground="#FFB42318"
+                     TextWrapping="Wrap" />
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Grid Grid.Row="2" Margin="24,8,24,24">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <Button Grid.Column="1"
+              x:Name="ConnectButton"
+              Width="140"
+              Content="Подключить"
+              Click="Connect_Click"
+              IsDefault="True" />
+      <Button Grid.Column="3"
+              Width="120"
+              Content="Отмена"
+              Style="{StaticResource GhostButtonStyle}"
+              Click="Cancel_Click"
+              IsCancel="True" />
+    </Grid>
+  </Grid>
+</Window>
