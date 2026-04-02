@@ -333,6 +333,12 @@ namespace Tournaments.WPF.Views
                 Binding binding = textColumn.Binding as Binding;
                 if (binding != null)
                 {
+                    binding.Converter = _dbNullValueConverter;
+                    binding.ConverterParameter = field.Type;
+                    binding.TargetNullValue = string.Empty;
+                    binding.ValidatesOnExceptions = true;
+                    binding.NotifyOnValidationError = true;
+
                     if (field.Type == FieldType.Date)
                     {
                         binding.StringFormat = "dd.MM.yyyy";
@@ -820,7 +826,7 @@ namespace Tournaments.WPF.Views
             return new DataGridComboBoxColumn
             {
                 ItemsSource = field.AllowedValues.ToList(),
-                SelectedItemBinding = CreateEditableBinding(field.Name),
+                SelectedItemBinding = CreateEditableBinding(field),
                 SortMemberPath = field.Name
             };
         }
@@ -833,18 +839,22 @@ namespace Tournaments.WPF.Views
                 ItemsSource = options,
                 DisplayMemberPath = nameof(LookupOption.Display),
                 SelectedValuePath = nameof(LookupOption.Value),
-                SelectedValueBinding = CreateEditableBinding(field.Name),
+                SelectedValueBinding = CreateEditableBinding(field),
                 SortMemberPath = field.Name
             };
         }
 
-        private Binding CreateEditableBinding(string propertyName)
+        private Binding CreateEditableBinding(FieldDefinition field)
         {
-            return new Binding(propertyName)
+            return new Binding(field.Name)
             {
                 Mode = BindingMode.TwoWay,
                 UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged,
-                Converter = _dbNullValueConverter
+                Converter = _dbNullValueConverter,
+                ConverterParameter = field.Type,
+                TargetNullValue = string.Empty,
+                ValidatesOnExceptions = true,
+                NotifyOnValidationError = true
             };
         }
 
@@ -1002,4 +1012,5 @@ namespace Tournaments.WPF.Views
         }
     }
 }
+
 
