@@ -621,7 +621,7 @@ namespace Tournaments.WPF.Views
             }
             catch (Exception ex)
             {
-                RemovePendingInsertRow("Ошибка сохранения: " + ex.Message);
+                RemovePendingInsertRow("Ошибка сохранения: " + NormalizePersistenceErrorMessage(ex.Message));
             }
             finally
             {
@@ -664,7 +664,7 @@ namespace Tournaments.WPF.Views
             }
             catch (Exception ex)
             {
-                RestorePendingEditRow("Ошибка сохранения: " + ex.Message);
+                RestorePendingEditRow("Ошибка сохранения: " + NormalizePersistenceErrorMessage(ex.Message));
             }
             finally
             {
@@ -833,6 +833,23 @@ namespace Tournaments.WPF.Views
 
             string text = value as string;
             return text != null && string.IsNullOrWhiteSpace(text);
+        }
+
+        private string NormalizePersistenceErrorMessage(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "Неизвестная ошибка.";
+            }
+
+            if (string.Equals(_definition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase) &&
+                (message.IndexOf("CK__Tournamen__MaxTe", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 message.IndexOf("CK_Tournaments_MaxTeams", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return "Текущая SQL-база данных всё ещё использует старое ограничение на MaxTeams. Для нечётного количества участников нужно обновить constraint в таблице Tournaments.";
+            }
+
+            return message;
         }
 
         private IDictionary<string, object> GetSelectedRowValues()

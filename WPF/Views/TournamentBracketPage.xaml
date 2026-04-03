@@ -170,9 +170,9 @@
               </Grid.ColumnDefinitions>
 
               <StackPanel Grid.Column="0">
-                <TextBlock Text="Команда 1" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <TextBlock Text="Участник 1" FontWeight="SemiBold" Foreground="#FF102A43" />
                 <ComboBox x:Name="Team1ComboBox" Height="38" Margin="0,8,0,0" SelectionChanged="TeamSelectionChanged" />
-                <TextBlock Text="Команда 2" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
+                <TextBlock Text="Участник 2" Margin="0,14,0,0" FontWeight="SemiBold" Foreground="#FF102A43" />
                 <ComboBox x:Name="Team2ComboBox" Height="38" Margin="0,8,0,0" SelectionChanged="TeamSelectionChanged" />
               </StackPanel>
 

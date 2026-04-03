@@ -188,30 +188,25 @@ namespace Tournaments.WPF.Services
                     throw new InvalidOperationException("Выбранный турнир не найден.");
                 }
 
-                if (tournament.Table.Columns.Contains("ParticipantMode") &&
-                    string.Equals(Convert.ToString(tournament["ParticipantMode"]), "Игроки", StringComparison.CurrentCultureIgnoreCase))
+                bool isPlayerMode = IsPlayerMode(GetTournamentParticipantMode(tournament));
+                List<int> orderedParticipantIds = GetOrderedParticipantIds(tournamentId, isPlayerMode);
+                if (orderedParticipantIds.Count < 2)
                 {
-                    throw new InvalidOperationException("Турнирная сетка пока поддерживается только для турниров с командами.");
-                }
-
-                List<int> orderedTeamIds = GetOrderedParticipantTeamIds(tournamentId);
-                if (orderedTeamIds.Count < 2)
-                {
-                    throw new InvalidOperationException("Для построения сетки нужно минимум две команды-участницы.");
+                    throw new InvalidOperationException("Для построения сетки нужно минимум два участника.");
                 }
 
                 RemoveGeneratedBracket(tournamentId);
 
-                int bracketSize = NextPowerOfTwo(orderedTeamIds.Count);
+                int bracketSize = NextPowerOfTwo(orderedParticipantIds.Count);
                 int roundCount = (int)Math.Log(bracketSize, 2);
                 int[] seedPositions = BuildSeedPositions(bracketSize);
                 int?[] slots = new int?[bracketSize];
                 for (int index = 0; index < seedPositions.Length; index++)
                 {
                     int seed = seedPositions[index];
-                    if (seed <= orderedTeamIds.Count)
+                    if (seed <= orderedParticipantIds.Count)
                     {
-                        slots[index] = orderedTeamIds[seed - 1];
+                        slots[index] = orderedParticipantIds[seed - 1];
                     }
                 }
 
@@ -244,6 +239,8 @@ namespace Tournaments.WPF.Services
                         {
                             match["Team1ID"] = slots[matchIndex * 2].HasValue ? (object)slots[matchIndex * 2].Value : DBNull.Value;
                             match["Team2ID"] = slots[matchIndex * 2 + 1].HasValue ? (object)slots[matchIndex * 2 + 1].Value : DBNull.Value;
+                            int? autoWinnerId = ResolveAutoAdvanceParticipantId(ToNullableInt(match["Team1ID"]), ToNullableInt(match["Team2ID"]));
+                            match["WinnerTeamID"] = autoWinnerId.HasValue ? (object)autoWinnerId.Value : DBNull.Value;
                         }
                         else
                         {
@@ -286,18 +283,19 @@ namespace Tournaments.WPF.Services
                 }
 
                 DataRow match = targetRound.Matches.First(row => AreEqual(row["MatchID"], request.MatchId));
-                List<int> availableTeams = GetOrderedParticipantTeamIds(tournamentId);
-                int? team1Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team1Id, availableTeams) : ToNullableInt(match["Team1ID"]);
-                int? team2Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team2Id, availableTeams) : ToNullableInt(match["Team2ID"]);
+                bool isPlayerMode = IsPlayerMode(GetTournamentParticipantMode(tournamentId));
+                List<int> availableParticipants = GetOrderedParticipantIds(tournamentId, isPlayerMode);
+                int? team1Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team1Id, availableParticipants) : ToNullableInt(match["Team1ID"]);
+                int? team2Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team2Id, availableParticipants) : ToNullableInt(match["Team2ID"]);
 
                 if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
                 {
-                    throw new InvalidOperationException("В одном матче нельзя выбрать одну и ту же команду дважды.");
+                    throw new InvalidOperationException("В одном матче нельзя выбрать одного и того же участника дважды.");
                 }
 
                 if (request.Team1Score < 0 || request.Team2Score < 0)
                 {
-                    throw new InvalidOperationException("Счет команды не может быть отрицательным.");
+                    throw new InvalidOperationException("Счет участника не может быть отрицательным.");
                 }
 
                 if (request.BestOf <= 0 || request.BestOf % 2 == 0)
@@ -450,7 +448,7 @@ namespace Tournaments.WPF.Services
 
             if (!availableTeams.Contains(teamId.Value))
             {
-                throw new InvalidOperationException("В сетке можно использовать только команды-участницы выбранного турнира.");
+                throw new InvalidOperationException("В сетке можно использовать только участников выбранного турнира.");
             }
 
             return teamId;
@@ -462,7 +460,7 @@ namespace Tournaments.WPF.Services
             {
                 if (winnerTeamId != team1Id && winnerTeamId != team2Id)
                 {
-                    throw new InvalidOperationException("Победитель должен совпадать с одной из команд матча.");
+                    throw new InvalidOperationException("Победитель должен совпадать с одним из участников матча.");
                 }
 
                 return winnerTeamId;
@@ -958,6 +956,31 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        private string GetTournamentParticipantMode(int tournamentId)
+        {
+            DataRow tournament = GetRequiredTable("Tournaments")
+                .Rows
+                .Cast<DataRow>()
+                .FirstOrDefault(row => AreEqual(row["TournamentID"], tournamentId));
+            return GetTournamentParticipantMode(tournament);
+        }
+
+        private static string GetTournamentParticipantMode(DataRow tournament)
+        {
+            if (tournament == null || !tournament.Table.Columns.Contains("ParticipantMode") || tournament["ParticipantMode"] == DBNull.Value)
+            {
+                return "Команды";
+            }
+
+            string mode = Convert.ToString(tournament["ParticipantMode"]);
+            return string.IsNullOrWhiteSpace(mode) ? "Команды" : mode;
+        }
+
+        private static bool IsPlayerMode(string participantMode)
+        {
+            return string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase);
+        }
+
         private int CreateBracketStage(int tournamentId, int stageOrder, int teamsInRound, bool isFinal)
         {
             DataTable stages = GetRequiredTable("TournamentStages");
@@ -972,17 +995,35 @@ namespace Tournaments.WPF.Services
             return stageId;
         }
 
-        private List<int> GetOrderedParticipantTeamIds(int tournamentId)
+        private List<int> GetOrderedParticipantIds(int tournamentId, bool isPlayerMode)
         {
+            string columnName = isPlayerMode ? "PlayerID" : "TeamID";
             return GetRequiredTable("TournamentParticipants")
                 .Rows
                 .Cast<DataRow>()
-                .Where(row => AreEqual(row["TournamentID"], tournamentId) && row["TeamID"] != DBNull.Value)
+                .Where(row => AreEqual(row["TournamentID"], tournamentId) &&
+                    row.Table.Columns.Contains(columnName) &&
+                    row[columnName] != DBNull.Value)
                 .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
                 .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
-                .ThenBy(row => Convert.ToInt32(row["TeamID"]))
-                .Select(row => Convert.ToInt32(row["TeamID"]))
+                .ThenBy(row => Convert.ToInt32(row[columnName]))
+                .Select(row => Convert.ToInt32(row[columnName]))
                 .ToList();
+        }
+
+        private static int? ResolveAutoAdvanceParticipantId(int? team1Id, int? team2Id)
+        {
+            if (team1Id.HasValue && !team2Id.HasValue)
+            {
+                return team1Id;
+            }
+
+            if (team2Id.HasValue && !team1Id.HasValue)
+            {
+                return team2Id;
+            }
+
+            return null;
         }
 
         private void RemoveGeneratedBracket(int tournamentId)

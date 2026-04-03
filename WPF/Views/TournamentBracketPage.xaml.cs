@@ -174,7 +174,7 @@ namespace Tournaments.WPF.Views
             int? team2Id = _selectedMatch.CanEditTeams ? GetSelectedTeamId(Team2ComboBox) : _selectedMatch.Team2Id;
             if (_selectedMatch.CanEditTeams && team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
             {
-                MessageBox.Show("В одном матче нельзя выбрать одну и ту же команду дважды.", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("В одном матче нельзя выбрать одного и того же участника дважды.", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -287,7 +287,7 @@ namespace Tournaments.WPF.Views
             BracketScrollViewer.Visibility = hasEnoughParticipants ? Visibility.Visible : Visibility.Collapsed;
             EmptyStateText.Visibility = hasEnoughParticipants ? Visibility.Collapsed : Visibility.Visible;
             EmptyStateText.Text = snapshot.ParticipantCount == 0
-                ? "У выбранного турнира пока нет участников. Добавьте команды во вкладке участников турниров."
+                ? "У выбранного турнира пока нет участников. Добавьте участников во вкладке участников турниров."
                 : "Для построения сетки нужно минимум 2 участника.";
 
             if (hasEnoughParticipants)
@@ -628,8 +628,8 @@ namespace Tournaments.WPF.Views
                 CancelEditButton.IsEnabled = true;
                 EditorSelectionText.Text = match.MatchCode + " • " + GetRoundTitle(match.RoundIndex);
                 EditorStateText.Text = match.CanEditTeams
-                    ? "Для первого раунда можно менять команды, счет, дату, статус и победителя."
-                    : "Для следующих раундов команды подставляются автоматически по победителям предыдущих матчей.";
+                    ? "Для первого раунда можно менять участников, счет, дату, статус и победителя."
+                    : "Для следующих раундов участники подставляются автоматически по победителям предыдущих матчей.";
                 TeamEditHintText.Text = match.CanEditTeams
                     ? "Пары можно переназначать только в матчах первого раунда."
                     : "Если вы измените результат предыдущего матча, участники этого раунда обновятся автоматически.";

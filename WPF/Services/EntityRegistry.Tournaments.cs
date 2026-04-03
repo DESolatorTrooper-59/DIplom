@@ -27,7 +27,7 @@ namespace Tournaments.WPF.Services
                     new FieldDefinition("Organizer", "Организатор", FieldType.Text),
                     new FieldDefinition("Location", "Место проведения", FieldType.Text),
                     new FieldDefinition("FormatType", "Формат", FieldType.Text) { IsRequired = true },
-                    new FieldDefinition("MaxTeams", "Макс. команд", FieldType.Integer) { IsRequired = true },
+                    new FieldDefinition("MaxTeams", "Макс. участников", FieldType.Integer) { IsRequired = true },
                     participantMode
                 });
 
@@ -47,9 +47,9 @@ namespace Tournaments.WPF.Services
                 }
 
                 int maxTeams = GetInt(context.Values, "MaxTeams");
-                if (maxTeams % 2 != 0)
+                if (maxTeams < 2)
                 {
-                    return EntityValidationResult.Fail("Количество команд должно быть чётным.");
+                    return EntityValidationResult.Fail("Количество участников должно быть не меньше 2.");
                 }
 
                 return EntityValidationResult.Success();

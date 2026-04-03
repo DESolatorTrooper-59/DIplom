@@ -33,25 +33,37 @@ namespace Tournaments.WPF.Services
 
         public List<BracketTeamOption> GetTeamOptions(int tournamentId)
         {
+            DataRow tournament = GetTournamentRow(tournamentId);
+            if (tournament == null)
+            {
+                return new List<BracketTeamOption>();
+            }
+
             DataTable participants = _database.GetTable("TournamentParticipants");
-            DataTable teams = _database.GetTable("Teams");
-            Dictionary<int, DataRow> teamsById = teams.Rows.Cast<DataRow>().ToDictionary(row => Convert.ToInt32(row["TeamID"]));
+            string participantMode = GetTournamentParticipantMode(tournament);
+            bool isPlayerMode = IsPlayerMode(participantMode);
+            Dictionary<int, DataRow> participantsById = GetParticipantLookup(participantMode);
 
             return participants.Rows
                 .Cast<DataRow>()
                 .Where(row => Convert.ToInt32(row["TournamentID"]) == tournamentId)
-                .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
-                .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
-                .ThenBy(row => GetTeamName(teamsById, Convert.ToInt32(row["TeamID"])))
-                .Select(row =>
+                .Select(row => new
                 {
-                    int teamId = Convert.ToInt32(row["TeamID"]);
-                    DataRow team = teamsById[teamId];
+                    Row = row,
+                    ParticipantId = GetParticipantId(row, isPlayerMode)
+                })
+                .Where(item => item.ParticipantId.HasValue && participantsById.ContainsKey(item.ParticipantId.Value))
+                .OrderBy(item => item.Row["Seed"] == DBNull.Value ? 1 : 0)
+                .ThenBy(item => item.Row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(item.Row["Seed"]))
+                .ThenBy(item => GetParticipantName(participantsById, item.ParticipantId.Value, isPlayerMode))
+                .Select(item =>
+                {
+                    DataRow participant = participantsById[item.ParticipantId.Value];
                     return new BracketTeamOption
                     {
-                        TeamId = teamId,
-                        TeamName = Convert.ToString(team["TeamName"]),
-                        SecondaryText = Convert.ToString(team["Country"])
+                        TeamId = item.ParticipantId.Value,
+                        TeamName = GetParticipantName(participantsById, item.ParticipantId.Value, isPlayerMode),
+                        SecondaryText = GetParticipantSecondaryText(participant, isPlayerMode)
                     };
                 })
                 .ToList();
@@ -114,32 +126,67 @@ namespace Tournaments.WPF.Services
             _database.UpdateBracketMatch(tournamentId, request);
         }
 
+        private DataRow GetTournamentRow(int tournamentId)
+        {
+            return _database.GetTable("Tournaments")
+                .Rows
+                .Cast<DataRow>()
+                .FirstOrDefault(row => Convert.ToInt32(row["TournamentID"]) == tournamentId);
+        }
+
+        private Dictionary<int, DataRow> GetParticipantLookup(string participantMode)
+        {
+            bool isPlayerMode = IsPlayerMode(participantMode);
+            string tableName = isPlayerMode ? "Players" : "Teams";
+            string keyColumn = isPlayerMode ? "PlayerID" : "TeamID";
+
+            return _database.GetTable(tableName)
+                .Rows
+                .Cast<DataRow>()
+                .Where(row => row[keyColumn] != DBNull.Value)
+                .ToDictionary(row => Convert.ToInt32(row[keyColumn]));
+        }
+
         private List<BracketParticipantViewModel> GetParticipants(int tournamentId)
         {
             DataTable participants = _database.GetTable("TournamentParticipants");
-            DataTable teams = _database.GetTable("Teams");
-            Dictionary<int, DataRow> teamsById = teams.Rows.Cast<DataRow>().ToDictionary(row => Convert.ToInt32(row["TeamID"]));
+            DataRow tournament = GetTournamentRow(tournamentId);
+            if (tournament == null)
+            {
+                return new List<BracketParticipantViewModel>();
+            }
 
-            List<DataRow> orderedRows = participants.Rows
+            string participantMode = GetTournamentParticipantMode(tournament);
+            bool isPlayerMode = IsPlayerMode(participantMode);
+            Dictionary<int, DataRow> participantsById = GetParticipantLookup(participantMode);
+
+            List<(DataRow Row, int ParticipantId)> orderedRows = participants.Rows
                 .Cast<DataRow>()
                 .Where(row => Convert.ToInt32(row["TournamentID"]) == tournamentId)
-                .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
-                .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
-                .ThenBy(row => GetTeamName(teamsById, Convert.ToInt32(row["TeamID"])))
+                .Select(row => new
+                {
+                    Row = row,
+                    ParticipantId = GetParticipantId(row, isPlayerMode)
+                })
+                .Where(item => item.ParticipantId.HasValue && participantsById.ContainsKey(item.ParticipantId.Value))
+                .OrderBy(item => item.Row["Seed"] == DBNull.Value ? 1 : 0)
+                .ThenBy(item => item.Row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(item.Row["Seed"]))
+                .ThenBy(item => GetParticipantName(participantsById, item.ParticipantId.Value, isPlayerMode))
+                .Select(item => (item.Row, item.ParticipantId.Value))
                 .ToList();
 
             List<BracketParticipantViewModel> result = new List<BracketParticipantViewModel>();
             for (int index = 0; index < orderedRows.Count; index++)
             {
-                DataRow row = orderedRows[index];
-                int teamId = Convert.ToInt32(row["TeamID"]);
-                DataRow team = teamsById[teamId];
+                DataRow row = orderedRows[index].Row;
+                int participantId = orderedRows[index].ParticipantId;
+                DataRow participant = participantsById[participantId];
                 result.Add(new BracketParticipantViewModel
                 {
-                    TeamId = teamId,
+                    TeamId = participantId,
                     Seed = index + 1,
-                    TeamName = Convert.ToString(team["TeamName"]),
-                    Country = Convert.ToString(team["Country"])
+                    TeamName = GetParticipantName(participantsById, participantId, isPlayerMode),
+                    Country = GetParticipantSecondaryText(participant, isPlayerMode)
                 });
             }
 
@@ -148,10 +195,12 @@ namespace Tournaments.WPF.Services
 
         private List<BracketRoundViewModel> BuildPersistedRounds(int tournamentId)
         {
+            DataRow tournament = GetTournamentRow(tournamentId);
+            string participantMode = GetTournamentParticipantMode(tournament);
+            bool isPlayerMode = IsPlayerMode(participantMode);
             DataTable stages = _database.GetTable("TournamentStages");
             DataTable matches = _database.GetTable("Matches");
-            DataTable teams = _database.GetTable("Teams");
-            Dictionary<int, DataRow> teamsById = teams.Rows.Cast<DataRow>().ToDictionary(row => Convert.ToInt32(row["TeamID"]));
+            Dictionary<int, DataRow> participantsById = GetParticipantLookup(participantMode);
 
             List<DataRow> bracketStages = stages.Rows
                 .Cast<DataRow>()
@@ -193,9 +242,9 @@ namespace Tournaments.WPF.Services
                     int? team1Id = ToNullableInt(row["Team1ID"]);
                     int? team2Id = ToNullableInt(row["Team2ID"]);
                     int? winnerTeamId = ResolveWinnerTeamId(row, team1Id, team2Id);
-                    string team1Name = ResolveStoredTeamName(team1Id, roundIndex, matchIndex * 2, previousRound, teamsById, true);
-                    string team2Name = ResolveStoredTeamName(team2Id, roundIndex, matchIndex * 2 + 1, previousRound, teamsById, false);
-                    string winnerName = winnerTeamId.HasValue ? ResolveTeamName(teamsById, winnerTeamId.Value) : string.Empty;
+                    string team1Name = ResolveStoredParticipantName(team1Id, roundIndex, matchIndex * 2, previousRound, participantsById, isPlayerMode, true);
+                    string team2Name = ResolveStoredParticipantName(team2Id, roundIndex, matchIndex * 2 + 1, previousRound, participantsById, isPlayerMode, false);
+                    string winnerName = winnerTeamId.HasValue ? ResolveParticipantName(participantsById, winnerTeamId.Value, isPlayerMode) : string.Empty;
                     int bestOf = ReadInt(row["BestOf"], 3);
                     DateTime? matchDate = ParseDate(row["MatchDate"]);
                     string status = Convert.ToString(row["Status"]);
@@ -217,7 +266,7 @@ namespace Tournaments.WPF.Services
                         MatchDate = matchDate,
                         MetaText = BuildMetaText(bestOf, matchDate),
                         Status = status,
-                        StatusText = BuildStatusText(status, winnerName),
+                        StatusText = BuildStatusText(status, winnerName, team1Id, team2Id),
                         WinnerName = winnerName,
                         IsEditable = true,
                         CanEditTeams = roundIndex == 0
@@ -271,7 +320,7 @@ namespace Tournaments.WPF.Services
                         BestOf = roundIndex == roundCount - 1 ? 5 : 3,
                         MatchDate = tournamentStartDate.AddDays(roundIndex),
                         Status = "Scheduled",
-                        StatusText = BuildStatusText("Scheduled", string.Empty),
+                        WinnerName = string.Empty,
                         IsEditable = false,
                         CanEditTeams = false
                     };
@@ -284,16 +333,35 @@ namespace Tournaments.WPF.Services
                         match.Team2Id = team2 == null ? (int?)null : team2.TeamId;
                         match.Team1Name = team1 == null ? "BYE" : team1.TeamName;
                         match.Team2Name = team2 == null ? "BYE" : team2.TeamName;
+                        ApplyAutoAdvancePreviewState(match);
                     }
                     else
                     {
                         BracketMatchViewModel source1 = previousRound[matchIndex * 2];
                         BracketMatchViewModel source2 = previousRound[matchIndex * 2 + 1];
-                        match.Team1Name = "Победитель " + source1.MatchCode;
-                        match.Team2Name = "Победитель " + source2.MatchCode;
+                        if (source1.WinnerTeamId.HasValue && !string.IsNullOrWhiteSpace(source1.WinnerName))
+                        {
+                            match.Team1Id = source1.WinnerTeamId;
+                            match.Team1Name = source1.WinnerName;
+                        }
+                        else
+                        {
+                            match.Team1Name = "Победитель " + source1.MatchCode;
+                        }
+
+                        if (source2.WinnerTeamId.HasValue && !string.IsNullOrWhiteSpace(source2.WinnerName))
+                        {
+                            match.Team2Id = source2.WinnerTeamId;
+                            match.Team2Name = source2.WinnerName;
+                        }
+                        else
+                        {
+                            match.Team2Name = "Победитель " + source2.MatchCode;
+                        }
                     }
 
                     match.MetaText = BuildMetaText(match.BestOf, match.MatchDate);
+                    match.StatusText = BuildStatusText(match.Status, match.WinnerName, match.Team1Id, match.Team2Id);
                     round.Matches.Add(match);
                 }
 
@@ -360,11 +428,11 @@ namespace Tournaments.WPF.Services
             return stageOrder >= 100 || stageName.StartsWith("Bracket - ", StringComparison.CurrentCultureIgnoreCase);
         }
 
-        private static string ResolveStoredTeamName(int? teamId, int roundIndex, int sourceMatchIndex, List<BracketMatchViewModel> previousRound, Dictionary<int, DataRow> teamsById, bool isTopSlot)
+        private static string ResolveStoredParticipantName(int? teamId, int roundIndex, int sourceMatchIndex, List<BracketMatchViewModel> previousRound, Dictionary<int, DataRow> participantsById, bool isPlayerMode, bool isTopSlot)
         {
             if (teamId.HasValue)
             {
-                return ResolveTeamName(teamsById, teamId.Value);
+                return ResolveParticipantName(participantsById, teamId.Value, isPlayerMode);
             }
 
             if (roundIndex == 0)
@@ -374,15 +442,27 @@ namespace Tournaments.WPF.Services
 
             if (sourceMatchIndex >= 0 && sourceMatchIndex < previousRound.Count)
             {
-                return "Победитель " + previousRound[sourceMatchIndex].MatchCode;
+                BracketMatchViewModel sourceMatch = previousRound[sourceMatchIndex];
+                if (sourceMatch.WinnerTeamId.HasValue && !string.IsNullOrWhiteSpace(sourceMatch.WinnerName))
+                {
+                    return sourceMatch.WinnerName;
+                }
+
+                return "Победитель " + sourceMatch.MatchCode;
             }
 
             return isTopSlot ? "TBD" : "TBD";
         }
 
-        private static string ResolveTeamName(Dictionary<int, DataRow> teamsById, int teamId)
+        private static string ResolveParticipantName(Dictionary<int, DataRow> participantsById, int participantId, bool isPlayerMode)
         {
-            return teamsById.ContainsKey(teamId) ? Convert.ToString(teamsById[teamId]["TeamName"]) : "Unknown Team";
+            if (!participantsById.ContainsKey(participantId))
+            {
+                return isPlayerMode ? "Unknown Player" : "Unknown Team";
+            }
+
+            DataRow participant = participantsById[participantId];
+            return isPlayerMode ? Convert.ToString(participant["Nickname"]) : Convert.ToString(participant["TeamName"]);
         }
 
         private static int? ResolveWinnerTeamId(DataRow matchRow, int? team1Id, int? team2Id)
@@ -420,8 +500,13 @@ namespace Tournaments.WPF.Services
             return datePart + " • BO" + bestOf;
         }
 
-        private static string BuildStatusText(string status, string winnerName)
+        private static string BuildStatusText(string status, string winnerName, int? team1Id, int? team2Id)
         {
+            if (team1Id.HasValue != team2Id.HasValue && !string.IsNullOrWhiteSpace(winnerName))
+            {
+                return "Автопроход • Победитель: " + winnerName;
+            }
+
             string translated = TranslateStatus(status);
             return string.IsNullOrWhiteSpace(winnerName)
                 ? translated
@@ -478,9 +563,74 @@ namespace Tournaments.WPF.Services
             return finalMatch == null ? string.Empty : finalMatch.WinnerName;
         }
 
-        private static string GetTeamName(Dictionary<int, DataRow> teamsById, int teamId)
+        private static string GetTournamentParticipantMode(DataRow tournament)
         {
-            return teamsById.ContainsKey(teamId) ? Convert.ToString(teamsById[teamId]["TeamName"]) : "Unknown Team";
+            if (tournament == null || !tournament.Table.Columns.Contains("ParticipantMode") || tournament["ParticipantMode"] == DBNull.Value)
+            {
+                return "Команды";
+            }
+
+            string mode = Convert.ToString(tournament["ParticipantMode"]);
+            return string.IsNullOrWhiteSpace(mode) ? "Команды" : mode;
+        }
+
+        private static bool IsPlayerMode(string participantMode)
+        {
+            return string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        private static int? GetParticipantId(DataRow participantRow, bool isPlayerMode)
+        {
+            string columnName = isPlayerMode ? "PlayerID" : "TeamID";
+            if (!participantRow.Table.Columns.Contains(columnName) || participantRow[columnName] == DBNull.Value)
+            {
+                return null;
+            }
+
+            return Convert.ToInt32(participantRow[columnName]);
+        }
+
+        private static string GetParticipantName(Dictionary<int, DataRow> participantsById, int participantId, bool isPlayerMode)
+        {
+            return ResolveParticipantName(participantsById, participantId, isPlayerMode);
+        }
+
+        private static string GetParticipantSecondaryText(DataRow participant, bool isPlayerMode)
+        {
+            if (participant == null)
+            {
+                return string.Empty;
+            }
+
+            if (!isPlayerMode)
+            {
+                return participant.Table.Columns.Contains("Country") ? Convert.ToString(participant["Country"]) : string.Empty;
+            }
+
+            string realName = participant.Table.Columns.Contains("RealName") ? Convert.ToString(participant["RealName"]) : string.Empty;
+            string country = participant.Table.Columns.Contains("Country") ? Convert.ToString(participant["Country"]) : string.Empty;
+            if (string.IsNullOrWhiteSpace(realName))
+            {
+                return country;
+            }
+
+            return string.IsNullOrWhiteSpace(country) ? realName : realName + " • " + country;
+        }
+
+        private static void ApplyAutoAdvancePreviewState(BracketMatchViewModel match)
+        {
+            if (match.Team1Id.HasValue && !match.Team2Id.HasValue)
+            {
+                match.WinnerTeamId = match.Team1Id;
+                match.WinnerName = match.Team1Name;
+                return;
+            }
+
+            if (match.Team2Id.HasValue && !match.Team1Id.HasValue)
+            {
+                match.WinnerTeamId = match.Team2Id;
+                match.WinnerName = match.Team2Name;
+            }
         }
 
         private static DateTime? ParseDate(object value)

@@ -3,7 +3,7 @@
 	<Model>
 		<Element Type="SqlCheckConstraint">
 			<Property Name="CheckExpressionScript">
-				<Value><![CDATA[[MaxTeams]%(2)=(0)]]></Value>
+				<Value><![CDATA[[MaxTeams]>(1)]]></Value>
 			</Property>
 			<Relationship Name="CheckExpressionDependencies">
 				<Entry>

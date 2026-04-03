@@ -215,10 +215,15 @@ WHERE [MatchID] IN (
                     throw new InvalidOperationException("Выбранный турнир не найден.");
                 }
 
+                if (IsPlayerMode(GetTournamentParticipantMode(tournament)))
+                {
+                    throw new InvalidOperationException("В текущей схеме MS SQL Server сетка для турниров с игроками пока не поддерживается. Для этого нужна миграция таблицы Matches.");
+                }
+
                 List<int> orderedTeamIds = GetOrderedParticipantTeamIds(tournamentId, connection, transaction);
                 if (orderedTeamIds.Count < 2)
                 {
-                    throw new InvalidOperationException("Для построения сетки нужно минимум две команды-участницы.");
+                    throw new InvalidOperationException("Для построения сетки нужно минимум два участника.");
                 }
 
                 RemoveGeneratedBracket(connection, transaction, tournamentId);
@@ -248,14 +253,16 @@ WHERE [MatchID] IN (
 
                     for (int matchIndex = 0; matchIndex < matchesInRound; matchIndex++)
                     {
+                        int? team1Id = roundIndex == 0 ? slots[matchIndex * 2] : (int?)null;
+                        int? team2Id = roundIndex == 0 ? slots[matchIndex * 2 + 1] : (int?)null;
                         Dictionary<string, object> matchValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                         {
                             ["TournamentID"] = tournamentId,
                             ["StageID"] = stageId,
                             ["MatchNumber"] = matchNumber++,
-                            ["Team1ID"] = roundIndex == 0 ? (object)slots[matchIndex * 2] : null,
-                            ["Team2ID"] = roundIndex == 0 ? (object)slots[matchIndex * 2 + 1] : null,
-                            ["WinnerTeamID"] = null,
+                            ["Team1ID"] = team1Id,
+                            ["Team2ID"] = team2Id,
+                            ["WinnerTeamID"] = ResolveAutoAdvanceParticipantId(team1Id, team2Id),
                             ["Team1Score"] = 0,
                             ["Team2Score"] = 0,
                             ["MatchDate"] = tournamentStartDate.AddDays(roundIndex),
@@ -286,6 +293,13 @@ WHERE [MatchID] IN (
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlTransaction transaction = connection.BeginTransaction())
             {
+                DataTable tournaments = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[Tournaments] WHERE [TournamentID] = @TournamentID", "Tournaments", command => AddParameter(command, "@TournamentID", tournamentId));
+                DataRow tournament = tournaments.Rows.Cast<DataRow>().FirstOrDefault();
+                if (tournament != null && IsPlayerMode(GetTournamentParticipantMode(tournament)))
+                {
+                    throw new InvalidOperationException("В текущей схеме MS SQL Server редактирование сетки турниров с игроками пока не поддерживается. Для этого нужна миграция таблицы Matches.");
+                }
+
                 List<SqlBracketRoundState> rounds = GetGeneratedBracketRounds(tournamentId, connection, transaction);
                 if (rounds.Count == 0)
                 {
@@ -305,12 +319,12 @@ WHERE [MatchID] IN (
 
                 if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
                 {
-                    throw new InvalidOperationException("В одном матче нельзя выбрать одну и ту же команду дважды.");
+                    throw new InvalidOperationException("В одном матче нельзя выбрать одного и того же участника дважды.");
                 }
 
                 if (request.Team1Score < 0 || request.Team2Score < 0)
                 {
-                    throw new InvalidOperationException("Счет команды не может быть отрицательным.");
+                    throw new InvalidOperationException("Счет участника не может быть отрицательным.");
                 }
 
                 if (request.BestOf <= 0 || request.BestOf % 2 == 0)
@@ -578,6 +592,7 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
             DataTable participants = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", "TournamentParticipants", command => AddParameter(command, "@TournamentID", tournamentId));
             return participants.Rows
                 .Cast<DataRow>()
+                .Where(row => row["TeamID"] != DBNull.Value)
                 .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
                 .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
                 .ThenBy(row => Convert.ToInt32(row["TeamID"]))
@@ -753,7 +768,7 @@ WHERE [MatchID] = @MatchID", command =>
 
             if (!availableTeams.Contains(teamId.Value))
             {
-                throw new InvalidOperationException("В сетке можно использовать только команды-участницы выбранного турнира.");
+                throw new InvalidOperationException("В сетке можно использовать только участников выбранного турнира.");
             }
 
             return teamId;
@@ -765,7 +780,7 @@ WHERE [MatchID] = @MatchID", command =>
             {
                 if (winnerTeamId != team1Id && winnerTeamId != team2Id)
                 {
-                    throw new InvalidOperationException("Победитель должен совпадать с одной из команд матча.");
+                    throw new InvalidOperationException("Победитель должен совпадать с одним из участников матча.");
                 }
 
                 return winnerTeamId;
@@ -787,6 +802,37 @@ WHERE [MatchID] = @MatchID", command =>
             }
 
             return null;
+        }
+
+        private static int? ResolveAutoAdvanceParticipantId(int? team1Id, int? team2Id)
+        {
+            if (team1Id.HasValue && !team2Id.HasValue)
+            {
+                return team1Id;
+            }
+
+            if (team2Id.HasValue && !team1Id.HasValue)
+            {
+                return team2Id;
+            }
+
+            return null;
+        }
+
+        private static string GetTournamentParticipantMode(DataRow tournament)
+        {
+            if (tournament == null || !tournament.Table.Columns.Contains("ParticipantMode") || tournament["ParticipantMode"] == DBNull.Value)
+            {
+                return "Команды";
+            }
+
+            string mode = Convert.ToString(tournament["ParticipantMode"]);
+            return string.IsNullOrWhiteSpace(mode) ? "Команды" : mode;
+        }
+
+        private static bool IsPlayerMode(string participantMode)
+        {
+            return string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase);
         }
 
         private static object NormalizeDateValue(object value)
