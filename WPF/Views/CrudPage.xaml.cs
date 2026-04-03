@@ -987,10 +987,13 @@ namespace Tournaments.WPF.Views
         }
         private DataGridColumn CreateChoiceColumn(FieldDefinition field)
         {
+            Style comboBoxStyle = ResolveDataGridComboBoxStyle();
             return new DataGridComboBoxColumn
             {
                 ItemsSource = field.AllowedValues.ToList(),
                 SelectedItemBinding = CreateSelectorBinding(field),
+                ElementStyle = comboBoxStyle,
+                EditingElementStyle = comboBoxStyle,
                 SortMemberPath = field.Name
             };
         }
@@ -998,14 +1001,23 @@ namespace Tournaments.WPF.Views
         private DataGridColumn CreateLookupColumn(FieldDefinition field)
         {
             IReadOnlyList<LookupOption> options = GetLookupOptions(field);
+            Style comboBoxStyle = ResolveDataGridComboBoxStyle();
             return new DataGridComboBoxColumn
             {
                 ItemsSource = options,
                 DisplayMemberPath = nameof(LookupOption.Display),
                 SelectedValuePath = nameof(LookupOption.Value),
                 SelectedValueBinding = CreateSelectorBinding(field),
+                ElementStyle = comboBoxStyle,
+                EditingElementStyle = comboBoxStyle,
                 SortMemberPath = field.Name
             };
+        }
+
+        private static Style ResolveDataGridComboBoxStyle()
+        {
+            return Application.Current.TryFindResource("DataGridComboBoxStyle") as Style
+                ?? Application.Current.TryFindResource(typeof(ComboBox)) as Style;
         }
 
         private Binding CreateEditableBinding(FieldDefinition field)

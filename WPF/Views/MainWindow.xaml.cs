@@ -20,6 +20,7 @@ namespace Tournaments.WPF.Views
             _database = database;
             _crud = new EntityCrudService(database);
             _login = login;
+            UpdateThemeToggleState();
             Loaded += MainWindow_Loaded;
         }
 
@@ -94,6 +95,21 @@ namespace Tournaments.WPF.Views
             Application.Current.MainWindow = loginWindow;
             loginWindow.Show();
             Close();
+        }
+
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            ThemeManager.ApplyTheme(ThemeManager.CurrentTheme == AppTheme.Light ? AppTheme.Dark : AppTheme.Light);
+            UpdateThemeToggleState();
+        }
+
+        private void UpdateThemeToggleState()
+        {
+            bool isLightTheme = ThemeManager.CurrentTheme == AppTheme.Light;
+            ThemeToggleIcon.Text = isLightTheme ? "☀" : "☾";
+            ThemeToggleButton.ToolTip = isLightTheme
+                ? "Светлая тема активна. Нажмите, чтобы включить тёмную."
+                : "Тёмная тема активна. Нажмите, чтобы включить светлую.";
         }
 
         private static List<NavigationItem> BuildNavigationItems()
