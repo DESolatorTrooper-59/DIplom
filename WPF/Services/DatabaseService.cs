@@ -82,6 +82,11 @@ namespace Tournaments.WPF.Services
             _backend.Delete(tableName, keyColumns, originalValues);
         }
 
+        public void DeleteTournamentCascade(int tournamentId)
+        {
+            _backend.DeleteTournamentCascade(tournamentId);
+        }
+
         public EntityDefinition GetEffectiveDefinition(EntityDefinition definition)
         {
             if (definition == null)

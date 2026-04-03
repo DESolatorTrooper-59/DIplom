@@ -75,6 +75,11 @@ namespace Tournaments.WPF.Services
             _store.Delete(tableName, keyColumns, originalValues);
         }
 
+        public void DeleteTournamentCascade(int tournamentId)
+        {
+            _store.DeleteTournamentCascade(tournamentId);
+        }
+
         public void ReplaceTableContents(string tableName, DataTable importedTable)
         {
             _store.ReplaceTableContents(tableName, importedTable);

@@ -152,6 +152,28 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        public void DeleteTournamentCascade(int tournamentId)
+        {
+            lock (_syncRoot)
+            {
+                DataTable matches = GetRequiredTable("Matches");
+                HashSet<int> matchIds = new HashSet<int>(
+                    matches.Rows
+                        .Cast<DataRow>()
+                        .Where(row => AreEqual(row["TournamentID"], tournamentId))
+                        .Select(row => Convert.ToInt32(row["MatchID"])));
+
+                RemoveRows(GetRequiredTable("Streams"), row =>
+                    row["MatchID"] != DBNull.Value &&
+                    matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+                RemoveRows(matches, row => AreEqual(row["TournamentID"], tournamentId));
+                RemoveRows(GetRequiredTable("TournamentStages"), row => AreEqual(row["TournamentID"], tournamentId));
+                RemoveRows(GetRequiredTable("TournamentParticipants"), row => AreEqual(row["TournamentID"], tournamentId));
+                RemoveRows(GetRequiredTable("TournamentSponsors"), row => AreEqual(row["TournamentID"], tournamentId));
+                RemoveRows(GetRequiredTable("Tournaments"), row => AreEqual(row["TournamentID"], tournamentId));
+            }
+        }
+
         public int GenerateTournamentBracket(int tournamentId)
         {
             lock (_syncRoot)
@@ -921,6 +943,19 @@ namespace Tournaments.WPF.Services
             }
 
             return table;
+        }
+
+        private static void RemoveRows(DataTable table, Func<DataRow, bool> predicate)
+        {
+            List<DataRow> rowsToDelete = table.Rows
+                .Cast<DataRow>()
+                .Where(predicate)
+                .ToList();
+
+            foreach (DataRow row in rowsToDelete)
+            {
+                table.Rows.Remove(row);
+            }
         }
 
         private int CreateBracketStage(int tournamentId, int stageOrder, int teamsInRound, bool isFinal)

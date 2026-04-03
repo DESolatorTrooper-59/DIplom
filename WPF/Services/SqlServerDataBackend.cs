@@ -132,6 +132,32 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        public void DeleteTournamentCascade(int tournamentId)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlTransaction transaction = connection.BeginTransaction())
+            {
+                ExecuteNonQuery(connection, transaction, @"
+DELETE FROM [dbo].[Streams]
+WHERE [MatchID] IN (
+    SELECT [MatchID]
+    FROM [dbo].[Matches]
+    WHERE [TournamentID] = @TournamentID
+)", command => AddParameter(command, "@TournamentID", tournamentId));
+
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentSponsors] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+                DeleteRow(connection, transaction, "Tournaments", new[] { "TournamentID" }, new Dictionary<string, object>
+                {
+                    ["TournamentID"] = tournamentId
+                });
+
+                transaction.Commit();
+            }
+        }
+
         public void ReplaceTableContents(string tableName, DataTable importedTable)
         {
             if (importedTable == null)

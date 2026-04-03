@@ -33,6 +33,8 @@ namespace Tournaments.WPF.Services
 
         void Delete(string tableName, string[] keyColumns, IDictionary<string, object> originalValues);
 
+        void DeleteTournamentCascade(int tournamentId);
+
         void ReplaceTableContents(string tableName, DataTable importedTable);
 
         int GenerateTournamentBracket(int tournamentId);

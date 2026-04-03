@@ -91,6 +91,11 @@ namespace Tournaments.WPF.Services
             throw CreateUnsupportedException();
         }
 
+        public void DeleteTournamentCascade(int tournamentId)
+        {
+            throw CreateUnsupportedException();
+        }
+
         public void ReplaceTableContents(string tableName, DataTable importedTable)
         {
             DataTable copy = importedTable?.Copy() ?? throw new ArgumentNullException(nameof(importedTable));
