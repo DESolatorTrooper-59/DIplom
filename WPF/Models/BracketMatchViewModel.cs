@@ -4,6 +4,8 @@ namespace Tournaments.WPF.Models
     {
         public int MatchId { get; set; }
 
+        public string MatchKey { get; set; }
+
         public int RoundIndex { get; set; }
 
         public int MatchIndex { get; set; }
@@ -39,5 +41,9 @@ namespace Tournaments.WPF.Models
         public bool IsEditable { get; set; }
 
         public bool CanEditTeams { get; set; }
+
+        public string SourceMatchKey1 { get; set; }
+
+        public string SourceMatchKey2 { get; set; }
     }
 }

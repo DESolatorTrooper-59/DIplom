@@ -12,6 +12,11 @@ namespace Tournaments.WPF.Services
             participantMode.AllowedValues.Add("Команды");
             participantMode.AllowedValues.Add("Игроки");
 
+            FieldDefinition formatType = new FieldDefinition("FormatType", "Формат", FieldType.Choice) { IsRequired = true };
+            formatType.AllowedValues.Add("Single Elimination");
+            formatType.AllowedValues.Add("Double Elimination");
+            formatType.AllowedValues.Add("League");
+
             EntityDefinition definition = new EntityDefinition(
                 "Tournaments",
                 "Турниры",
@@ -26,7 +31,7 @@ namespace Tournaments.WPF.Services
                     new FieldDefinition("PrizePool", "Призовой фонд", FieldType.Decimal),
                     new FieldDefinition("Organizer", "Организатор", FieldType.Text),
                     new FieldDefinition("Location", "Место проведения", FieldType.Text),
-                    new FieldDefinition("FormatType", "Формат", FieldType.Text) { IsRequired = true },
+                    formatType,
                     new FieldDefinition("MaxTeams", "Макс. участников", FieldType.Integer) { IsRequired = true },
                     participantMode
                 });
@@ -50,6 +55,12 @@ namespace Tournaments.WPF.Services
                 if (maxTeams < 2)
                 {
                     return EntityValidationResult.Fail("Количество участников должно быть не меньше 2.");
+                }
+
+                string formatValue = Convert.ToString(context.Values["FormatType"]);
+                if (!formatType.AllowedValues.Contains(formatValue))
+                {
+                    return EntityValidationResult.Fail("Выберите один из поддерживаемых форматов турнира.");
                 }
 
                 return EntityValidationResult.Success();

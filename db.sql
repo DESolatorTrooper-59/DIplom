@@ -109,6 +109,7 @@ CREATE TABLE [dbo].[Tournaments]
         REFERENCES [dbo].[GameTitles] ([GameID]),
     CONSTRAINT [CHK_Tournaments_MaxTeams] CHECK ([MaxTeams] > 1),
     CONSTRAINT [CHK_Tournaments_Dates] CHECK ([EndDate] IS NULL OR [EndDate] >= [StartDate]),
+    CONSTRAINT [CHK_Tournaments_FormatType] CHECK ([FormatType] IN (N'Single Elimination', N'Double Elimination', N'League')),
     CONSTRAINT [CHK_Tournaments_ParticipantMode] CHECK ([ParticipantMode] IN (N'Команды', N'Игроки'))
 );
 GO

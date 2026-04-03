@@ -114,7 +114,10 @@ namespace Tournaments.WPF.Views
                     SelectMatch(_currentSnapshot?.Rounds.SelectMany(round => round.Matches).FirstOrDefault(match => match.IsEditable));
                 }
 
-                MessageBox.Show("Сетка создана. В хранилище добавлено матчей: " + createdMatches + ".", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Information);
+                string noun = _currentSnapshot != null && string.Equals(_currentSnapshot.FormatType, "League", StringComparison.OrdinalIgnoreCase)
+                    ? "Расписание"
+                    : "Сетка";
+                MessageBox.Show(noun + " создано. В хранилище добавлено матчей: " + createdMatches + ".", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -288,7 +291,7 @@ namespace Tournaments.WPF.Views
             EmptyStateText.Visibility = hasEnoughParticipants ? Visibility.Collapsed : Visibility.Visible;
             EmptyStateText.Text = snapshot.ParticipantCount == 0
                 ? "У выбранного турнира пока нет участников. Добавьте участников во вкладке участников турниров."
-                : "Для построения сетки нужно минимум 2 участника.";
+                : "Для построения формата турнира нужно минимум 2 участника.";
 
             if (hasEnoughParticipants)
             {
@@ -304,40 +307,8 @@ namespace Tournaments.WPF.Views
 
         private void RenderBracket(TournamentBracketSnapshot snapshot)
         {
-            BracketCanvas.Children.Clear();
-            if (snapshot.Rounds.Count == 0)
-            {
-                return;
-            }
-
-            int roundCount = snapshot.Rounds.Count;
-            _currentRoundCount = roundCount;
-            int firstRoundMatches = snapshot.Rounds[0].Matches.Count;
-            double totalWidth = CanvasPadding * 2 + (roundCount + 1) * ColumnWidth + roundCount * ColumnGap;
-            double totalHeight = Math.Max(460, MatchesTop + firstRoundMatches * FirstRoundStep + 32);
-
-            BracketCanvas.Width = totalWidth;
-            BracketCanvas.Height = totalHeight;
-
-            DrawTournamentCaption(snapshot.TournamentName);
-            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundColumnFrame(roundIndex, snapshot.Rounds[roundIndex].Title, totalHeight);
-            }
-
-            DrawChampionColumnFrame(roundCount, totalHeight);
-            for (int roundIndex = 1; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundConnectors(roundIndex);
-            }
-
-            DrawChampionConnector(roundCount);
-            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundMatches(roundIndex, snapshot.Rounds[roundIndex]);
-            }
-
-            DrawChampionCard(roundCount, snapshot.ChampionName);
+            _currentRoundCount = snapshot.Rounds.Count;
+            TournamentBracketRenderer.Render(BracketCanvas, snapshot, _selectedMatch == null ? (int?)null : _selectedMatch.MatchId, MatchCard_MouseLeftButtonUp);
         }
 
         private void DrawRoundMatches(int roundIndex, BracketRoundViewModel round)
@@ -607,7 +578,7 @@ namespace Tournaments.WPF.Views
         {
             if (_currentSnapshot == null || !_currentSnapshot.HasGeneratedBracket)
             {
-                ClearEditor("Редактирование станет доступно после создания сетки для выбранного турнира.");
+                ClearEditor("Редактирование станет доступно после создания формата для выбранного турнира.");
                 return;
             }
 
@@ -630,11 +601,11 @@ namespace Tournaments.WPF.Views
                 CancelEditButton.IsEnabled = true;
                 EditorSelectionText.Text = match.MatchCode + " • " + GetRoundTitle(match.RoundIndex);
                 EditorStateText.Text = match.CanEditTeams
-                    ? "Для первого раунда можно менять участников, счет, дату, статус и победителя."
-                    : "Для следующих раундов участники подставляются автоматически по победителям предыдущих матчей.";
+                    ? "Для этого матча можно менять участников, счет, дату, статус и победителя."
+                    : "Состав этого матча заполняется автоматически по правилам выбранного формата турнира.";
                 TeamEditHintText.Text = match.CanEditTeams
-                    ? "Пары можно переназначать только в матчах первого раунда."
-                    : "Если вы измените результат предыдущего матча, участники этого раунда обновятся автоматически.";
+                    ? "Ручное изменение участников доступно только для стартовых матчей формата."
+                    : "Если вы измените результат зависимого матча, участники этой встречи обновятся автоматически.";
 
                 List<BracketTeamOption> availableTeams = BuildTeamOptions("Не назначена");
                 ConfigureTeamComboBox(Team1ComboBox, availableTeams, match.Team1Id, match.CanEditTeams);
@@ -791,11 +762,21 @@ namespace Tournaments.WPF.Views
                 return string.Empty;
             }
 
+            bool isLeague = string.Equals(snapshot.FormatType, "League", StringComparison.OrdinalIgnoreCase);
             string modeText = snapshot.HasGeneratedBracket
-                ? "Сетка сохранена. Кликните по матчу, чтобы изменить его и автоматически обновить следующие раунды."
-                : "Пока показан предпросмотр. Нажмите «Создать сетку», чтобы сохранить ее и включить редактирование.";
+                ? (isLeague
+                    ? "Расписание сохранено. Можно редактировать результаты матчей и автоматически пересчитывать таблицу."
+                    : "Сетка сохранена. Кликните по матчу, чтобы изменить его и автоматически обновить зависимые встречи.")
+                : (isLeague
+                    ? "Пока показан предпросмотр расписания. Нажмите «Создать сетку», чтобы сохранить матчи и включить редактирование."
+                    : "Пока показан предпросмотр сетки. Нажмите «Создать сетку», чтобы сохранить ее и включить редактирование.");
 
-            return snapshot.TournamentName + ": участников " + snapshot.ParticipantCount + ", размер сетки " + snapshot.BracketSize + ", матчей в сетке " + snapshot.MatchCount + ". " + modeText;
+            if (isLeague)
+            {
+                return snapshot.TournamentName + ": участников " + snapshot.ParticipantCount + ", туров " + snapshot.Rounds.Count + ", матчей " + snapshot.MatchCount + ". " + modeText;
+            }
+
+            return snapshot.TournamentName + ": формат " + snapshot.FormatType + ", участников " + snapshot.ParticipantCount + ", размер сетки " + snapshot.BracketSize + ", матчей " + snapshot.MatchCount + ". " + modeText;
         }
 
         private static bool TryParseNonNegativeInt(string text, out int value)

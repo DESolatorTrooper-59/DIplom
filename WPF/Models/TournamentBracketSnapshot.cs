@@ -22,6 +22,8 @@ namespace Tournaments.WPF.Models
 
         public bool HasGeneratedBracket { get; set; }
 
+        public string FormatType { get; set; }
+
         public string ChampionName { get; set; }
 
         public List<BracketParticipantViewModel> Participants { get; }

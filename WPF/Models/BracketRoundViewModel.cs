@@ -11,6 +11,12 @@ namespace Tournaments.WPF.Models
 
         public string Title { get; set; }
 
+        public string SectionKey { get; set; }
+
+        public int LayoutColumn { get; set; }
+
+        public int SectionIndex { get; set; }
+
         public List<BracketMatchViewModel> Matches { get; }
     }
 }

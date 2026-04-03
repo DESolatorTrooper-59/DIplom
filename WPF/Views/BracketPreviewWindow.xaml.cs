@@ -45,9 +45,14 @@ namespace Tournaments.WPF.Views
             TournamentBracketSnapshot snapshot = _bracketService.BuildPreview(_tournamentId);
             Title = string.IsNullOrWhiteSpace(snapshot.TournamentName) ? "Турнирная сетка" : snapshot.TournamentName + " - турнирная сетка";
             TitleText.Text = string.IsNullOrWhiteSpace(snapshot.TournamentName) ? "Турнирная сетка" : snapshot.TournamentName;
+            bool isLeague = string.Equals(snapshot.FormatType, "League", StringComparison.OrdinalIgnoreCase);
             SubtitleText.Text = snapshot.HasGeneratedBracket
-                ? "Открыта сохраненная сетка турнира в отдельном окне просмотра."
-                : "Открыт предпросмотр сетки. Чтобы начать полноценное редактирование матчей, сначала создайте сетку на основной вкладке.";
+                ? (isLeague
+                    ? "Открыто сохраненное расписание турнира в отдельном окне просмотра."
+                    : "Открыта сохраненная сетка турнира в отдельном окне просмотра.")
+                : (isLeague
+                    ? "Открыт предпросмотр расписания. Чтобы начать редактирование матчей, сначала создайте формат на основной вкладке."
+                    : "Открыт предпросмотр сетки. Чтобы начать полноценное редактирование матчей, сначала создайте сетку на основной вкладке.");
             SummaryText.Text = BuildSummary(snapshot);
 
             bool hasEnoughParticipants = snapshot.ParticipantCount >= 2;
@@ -55,7 +60,7 @@ namespace Tournaments.WPF.Views
             EmptyStateText.Visibility = hasEnoughParticipants ? Visibility.Collapsed : Visibility.Visible;
             EmptyStateText.Text = snapshot.ParticipantCount == 0
                 ? "У выбранного турнира пока нет участников."
-                : "Для построения сетки нужно минимум 2 участника.";
+                : "Для построения формата турнира нужно минимум 2 участника.";
 
             if (hasEnoughParticipants && snapshot.Rounds.Count > 0)
             {
@@ -68,40 +73,8 @@ namespace Tournaments.WPF.Views
 
         private void RenderBracket(TournamentBracketSnapshot snapshot)
         {
-            BracketCanvas.Children.Clear();
-            if (snapshot.Rounds.Count == 0)
-            {
-                return;
-            }
-
-            int roundCount = snapshot.Rounds.Count;
-            _currentRoundCount = roundCount;
-            int firstRoundMatches = snapshot.Rounds[0].Matches.Count;
-            double totalWidth = CanvasPadding * 2 + (roundCount + 1) * ColumnWidth + roundCount * ColumnGap;
-            double totalHeight = Math.Max(460, MatchesTop + firstRoundMatches * FirstRoundStep + 32);
-
-            BracketCanvas.Width = totalWidth;
-            BracketCanvas.Height = totalHeight;
-
-            DrawTournamentCaption(snapshot.TournamentName);
-            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundColumnFrame(roundIndex, snapshot.Rounds[roundIndex].Title, totalHeight);
-            }
-
-            DrawChampionColumnFrame(roundCount, totalHeight);
-            for (int roundIndex = 1; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundConnectors(roundIndex);
-            }
-
-            DrawChampionConnector(roundCount);
-            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
-            {
-                DrawRoundMatches(roundIndex, snapshot.Rounds[roundIndex]);
-            }
-
-            DrawChampionCard(roundCount, snapshot.ChampionName);
+            _currentRoundCount = snapshot.Rounds.Count;
+            TournamentBracketRenderer.Render(BracketCanvas, snapshot, null, null);
         }
 
         private void DrawRoundMatches(int roundIndex, BracketRoundViewModel round)
@@ -346,11 +319,17 @@ namespace Tournaments.WPF.Views
                 return string.Empty;
             }
 
+            bool isLeague = string.Equals(snapshot.FormatType, "League", StringComparison.OrdinalIgnoreCase);
             string modeText = snapshot.HasGeneratedBracket
-                ? "Показывается сохраненная сетка турнира."
-                : "Показывается расчетный предпросмотр сетки без сохранения.";
+                ? (isLeague ? "Показывается сохраненное расписание турнира." : "Показывается сохраненная сетка турнира.")
+                : (isLeague ? "Показывается расчетный предпросмотр расписания без сохранения." : "Показывается расчетный предпросмотр сетки без сохранения.");
 
-            return snapshot.TournamentName + ": участников " + snapshot.ParticipantCount + ", размер сетки " + snapshot.BracketSize + ", матчей в сетке " + snapshot.MatchCount + ". " + modeText;
+            if (isLeague)
+            {
+                return snapshot.TournamentName + ": участников " + snapshot.ParticipantCount + ", туров " + snapshot.Rounds.Count + ", матчей " + snapshot.MatchCount + ". " + modeText;
+            }
+
+            return snapshot.TournamentName + ": формат " + snapshot.FormatType + ", участников " + snapshot.ParticipantCount + ", размер сетки " + snapshot.BracketSize + ", матчей " + snapshot.MatchCount + ". " + modeText;
         }
 
         private static string GetScoreText(int? teamId, string teamName, int score)
