@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Controls;
 using Tournaments.WPF.Models;
 using Tournaments.WPF.Services;
 
@@ -15,6 +16,8 @@ namespace Tournaments.WPF.Views
         private DatabaseService _sqlDatabase;
         private readonly SqlServerConnectionService _sqlConnectionService;
         private bool _isConnecting;
+        private bool _isPasswordVisible;
+        private bool _isUpdatingPasswordFields;
 
         public LoginWindow()
         {
@@ -47,6 +50,7 @@ namespace Tournaments.WPF.Views
 
         private void LoginWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            UpdatePasswordVisibility(false);
             LoginTextBox.Focus();
         }
 
@@ -61,7 +65,7 @@ namespace Tournaments.WPF.Views
             }
 
             string login = LoginTextBox.Text.Trim();
-            string password = PasswordTextBox.Password;
+            string password = GetLoginPassword();
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             {
                 SetLoginMessage("Введите логин и пароль.");
@@ -192,6 +196,53 @@ namespace Tournaments.WPF.Views
             Application.Current.Shutdown();
         }
 
+        private void TogglePasswordVisibility_Click(object sender, RoutedEventArgs e)
+        {
+            UpdatePasswordVisibility(!_isPasswordVisible);
+        }
+
+        private void PasswordTextBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingPasswordFields = true;
+            try
+            {
+                if (PasswordVisibleTextBox.Text != PasswordTextBox.Password)
+                {
+                    PasswordVisibleTextBox.Text = PasswordTextBox.Password;
+                }
+            }
+            finally
+            {
+                _isUpdatingPasswordFields = false;
+            }
+        }
+
+        private void PasswordVisibleTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingPasswordFields = true;
+            try
+            {
+                if (PasswordTextBox.Password != PasswordVisibleTextBox.Text)
+                {
+                    PasswordTextBox.Password = PasswordVisibleTextBox.Text;
+                }
+            }
+            finally
+            {
+                _isUpdatingPasswordFields = false;
+            }
+        }
+
         private void PopulateSqlSettings()
         {
             SqlServerConnectionSettings settings = _sqlConnectionService.GetSettings();
@@ -208,6 +259,56 @@ namespace Tournaments.WPF.Views
             bool useWindowsAuthentication = WindowsAuthCheckBox.IsChecked == true;
             SqlUserTextBox.IsEnabled = !useWindowsAuthentication;
             SqlPasswordTextBox.IsEnabled = !useWindowsAuthentication;
+        }
+
+        private string GetLoginPassword()
+        {
+            return _isPasswordVisible ? PasswordVisibleTextBox.Text : PasswordTextBox.Password;
+        }
+
+        private void UpdatePasswordVisibility(bool isVisible)
+        {
+            _isPasswordVisible = isVisible;
+            if (PasswordTextBox == null || PasswordVisibleTextBox == null || TogglePasswordVisibilityButton == null)
+            {
+                return;
+            }
+
+            _isUpdatingPasswordFields = true;
+            try
+            {
+                if (isVisible)
+                {
+                    PasswordVisibleTextBox.Text = PasswordTextBox.Password;
+                }
+                else
+                {
+                    PasswordTextBox.Password = PasswordVisibleTextBox.Text;
+                }
+            }
+            finally
+            {
+                _isUpdatingPasswordFields = false;
+            }
+
+            PasswordTextBox.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+            PasswordVisibleTextBox.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            TogglePasswordVisibilityButton.Content = isVisible ? "Скрыть" : "Показать";
+
+            if (!IsLoaded)
+            {
+                return;
+            }
+
+            if (isVisible)
+            {
+                PasswordVisibleTextBox.Focus();
+                PasswordVisibleTextBox.CaretIndex = PasswordVisibleTextBox.Text.Length;
+            }
+            else
+            {
+                PasswordTextBox.Focus();
+            }
         }
 
         private void SwitchMode(bool isSqlMode)
