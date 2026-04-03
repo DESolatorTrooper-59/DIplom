@@ -75,6 +75,7 @@ namespace Tournaments.WPF.Views
             }
 
             Dictionary<string, CardBounds> cardBounds = new Dictionary<string, CardBounds>(System.StringComparer.OrdinalIgnoreCase);
+            List<CardPlacement> cardPlacements = new List<CardPlacement>();
             foreach (BracketRoundViewModel round in snapshot.Rounds)
             {
                 double cardLeft = GetCardX(round.LayoutColumn);
@@ -91,12 +92,18 @@ namespace Tournaments.WPF.Views
                         card.MouseLeftButtonUp += matchClick;
                     }
 
-                    AddElement(canvas, card, cardLeft, cardTop);
+                    cardPlacements.Add(new CardPlacement(card, cardLeft, cardTop));
                     if (!string.IsNullOrWhiteSpace(match.MatchKey))
                     {
                         cardBounds[match.MatchKey] = new CardBounds(cardLeft, cardTop);
                     }
                 }
+            }
+
+            int championColumn = maxLayoutColumn + 1;
+            if (!isLeague)
+            {
+                AddElement(canvas, CreateColumnFrame("Чемпион", isDouble ? FinalSectionHeight : upperHeight), GetColumnX(championColumn), isDouble ? finalTop : upperTop);
             }
 
             foreach (BracketRoundViewModel round in snapshot.Rounds)
@@ -115,16 +122,12 @@ namespace Tournaments.WPF.Views
                 }
             }
 
+            Border championCard = null;
+            double championTop = 0;
             if (!isLeague)
             {
-                int championColumn = maxLayoutColumn + 1;
                 double championCenterY = ResolveChampionCenterY(snapshot.Rounds, cardBounds, upperTop, upperHeight, lowerTop, lowerHeight, finalTop);
-                double championTop = championCenterY - ChampionHeight / 2;
-                AddElement(canvas, CreateColumnFrame("Чемпион", isDouble ? FinalSectionHeight : upperHeight), GetColumnX(championColumn), isDouble ? finalTop : upperTop);
-
-                Border championCard = CreateChampionCard(snapshot.ChampionName);
-                AddElement(canvas, championCard, GetCardX(championColumn), championTop);
-
+                championTop = championCenterY - ChampionHeight / 2;
                 BracketMatchViewModel sourceMatch = finalRounds.SelectMany(round => round.Matches).FirstOrDefault() ??
                                                    upperRounds.LastOrDefault()?.Matches.FirstOrDefault() ??
                                                    mainRounds.LastOrDefault()?.Matches.FirstOrDefault();
@@ -133,6 +136,18 @@ namespace Tournaments.WPF.Views
                     CardBounds sourceBounds = cardBounds[sourceMatch.MatchKey];
                     DrawHorizontalConnector(canvas, sourceBounds.Right, sourceBounds.CenterY, GetCardX(championColumn), championCenterY);
                 }
+
+                championCard = CreateChampionCard(snapshot.ChampionName);
+            }
+
+            foreach (CardPlacement placement in cardPlacements)
+            {
+                AddElement(canvas, placement.Card, placement.Left, placement.Top);
+            }
+
+            if (championCard != null)
+            {
+                AddElement(canvas, championCard, GetCardX(championColumn), championTop);
             }
         }
 
@@ -233,8 +248,11 @@ namespace Tournaments.WPF.Views
                 {
                     Text = title,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(8, 3, 8, 0),
                     FontWeight = FontWeights.SemiBold,
+                    TextAlignment = TextAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
                     Foreground = ThemeBrush("BracketHeaderTextBrush", new SolidColorBrush(Color.FromRgb(17, 24, 39)))
                 }
             });
@@ -470,6 +488,22 @@ namespace Tournaments.WPF.Views
             public double TopSlotY => Top + 14;
 
             public double BottomSlotY => Top + 74;
+        }
+
+        private sealed class CardPlacement
+        {
+            public CardPlacement(Border card, double left, double top)
+            {
+                Card = card;
+                Left = left;
+                Top = top;
+            }
+
+            public Border Card { get; }
+
+            public double Left { get; }
+
+            public double Top { get; }
         }
     }
 }
