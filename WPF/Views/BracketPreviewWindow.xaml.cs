@@ -119,7 +119,7 @@ namespace Tournaments.WPF.Views
                 Text = tournamentName,
                 FontSize = 24,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(31, 41, 55))
+                Foreground = ThemeBrush("TextPrimaryBrush", new SolidColorBrush(Color.FromRgb(31, 41, 55)))
             };
 
             AddElement(title, CanvasPadding, 0);
@@ -132,8 +132,8 @@ namespace Tournaments.WPF.Views
             {
                 Width = ColumnWidth,
                 Height = totalHeight - ColumnTop,
-                Background = new SolidColorBrush(Color.FromRgb(240, 240, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(223, 223, 238)),
+                Background = ThemeBrush("BracketColumnBackgroundBrush", new SolidColorBrush(Color.FromRgb(240, 240, 250))),
+                BorderBrush = ThemeBrush("BracketColumnBorderBrush", new SolidColorBrush(Color.FromRgb(223, 223, 238))),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4)
             };
@@ -183,9 +183,9 @@ namespace Tournaments.WPF.Views
                 Width = MatchWidth,
                 Height = ChampionHeight,
                 CornerRadius = new CornerRadius(4),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(116, 116, 116)),
+                BorderBrush = ThemeBrush("ChampionBorderBrush", new SolidColorBrush(Color.FromRgb(116, 116, 116))),
                 BorderThickness = new Thickness(1),
-                Background = new LinearGradientBrush(Color.FromRgb(245, 245, 245), Color.FromRgb(178, 178, 178), new Point(0.5, 0), new Point(0.5, 1)),
+                Background = ThemeGradient("ChampionStartBrush", "ChampionEndBrush", Color.FromRgb(245, 245, 245), Color.FromRgb(178, 178, 178)),
                 Child = new TextBlock
                 {
                     Text = string.IsNullOrWhiteSpace(championName) ? "Будет определен" : championName,
@@ -193,7 +193,7 @@ namespace Tournaments.WPF.Views
                     VerticalAlignment = VerticalAlignment.Center,
                     FontWeight = FontWeights.SemiBold,
                     TextTrimming = TextTrimming.CharacterEllipsis,
-                    Foreground = new SolidColorBrush(Color.FromRgb(31, 41, 55))
+                    Foreground = ThemeBrush("ChampionTextBrush", new SolidColorBrush(Color.FromRgb(31, 41, 55)))
                 }
             };
 
@@ -206,8 +206,8 @@ namespace Tournaments.WPF.Views
             {
                 Width = ColumnWidth,
                 Height = HeaderHeight,
-                Background = new LinearGradientBrush(Color.FromRgb(252, 252, 252), Color.FromRgb(183, 183, 183), new Point(0.5, 0), new Point(0.5, 1)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(118, 118, 118)),
+                Background = ThemeGradient("BracketHeaderStartBrush", "BracketHeaderEndBrush", Color.FromRgb(252, 252, 252), Color.FromRgb(183, 183, 183)),
+                BorderBrush = ThemeBrush("BracketHeaderBorderBrush", new SolidColorBrush(Color.FromRgb(118, 118, 118))),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4),
                 Child = new TextBlock
@@ -216,7 +216,7 @@ namespace Tournaments.WPF.Views
                     HorizontalAlignment = HorizontalAlignment.Center,
                     VerticalAlignment = VerticalAlignment.Center,
                     FontWeight = FontWeights.SemiBold,
-                    Foreground = new SolidColorBrush(Color.FromRgb(17, 24, 39))
+                    Foreground = ThemeBrush("BracketHeaderTextBrush", new SolidColorBrush(Color.FromRgb(17, 24, 39)))
                 }
             };
         }
@@ -240,7 +240,7 @@ namespace Tournaments.WPF.Views
             {
                 Text = match.MatchCode + " • " + match.MetaText,
                 FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromRgb(70, 85, 105)),
+                Foreground = ThemeBrush("BracketMetaBrush", new SolidColorBrush(Color.FromRgb(70, 85, 105))),
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
             metaPanel.Children.Add(new TextBlock
@@ -248,7 +248,7 @@ namespace Tournaments.WPF.Views
                 Text = match.StatusText,
                 FontSize = 10,
                 Margin = new Thickness(0, 2, 0, 0),
-                Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+                Foreground = ThemeBrush("BracketStatusBrush", new SolidColorBrush(Color.FromRgb(100, 116, 139))),
                 TextTrimming = TextTrimming.CharacterEllipsis
             });
             Grid.SetRow(metaPanel, 1);
@@ -259,9 +259,9 @@ namespace Tournaments.WPF.Views
                 Width = MatchWidth,
                 Height = MatchHeight,
                 CornerRadius = new CornerRadius(4),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(64, 117, 217)),
+                BorderBrush = ThemeBrush("BracketMatchCardBorderBrush", new SolidColorBrush(Color.FromRgb(64, 117, 217))),
                 BorderThickness = new Thickness(1),
-                Background = Brushes.White,
+                Background = ThemeBrush("BracketMatchCardBackgroundBrush", Brushes.White),
                 Child = grid
             };
         }
@@ -280,7 +280,7 @@ namespace Tournaments.WPF.Views
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(17, 24, 39))
+                Foreground = ThemeBrush("BracketMatchTextBrush", new SolidColorBrush(Color.FromRgb(17, 24, 39)))
             };
             grid.Children.Add(teamText);
 
@@ -290,7 +290,7 @@ namespace Tournaments.WPF.Views
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(30, 64, 175))
+                Foreground = ThemeBrush("BracketScoreBrush", new SolidColorBrush(Color.FromRgb(30, 64, 175)))
             };
             Grid.SetColumn(score, 1);
             grid.Children.Add(score);
@@ -298,21 +298,21 @@ namespace Tournaments.WPF.Views
             Brush background;
             if (string.Equals(teamName, "BYE", StringComparison.CurrentCultureIgnoreCase))
             {
-                background = new SolidColorBrush(Color.FromRgb(232, 236, 244));
+                background = ThemeBrush("BracketByeBackgroundBrush", new SolidColorBrush(Color.FromRgb(232, 236, 244)));
             }
             else if (isWinner)
             {
-                background = new LinearGradientBrush(Color.FromRgb(240, 253, 244), Color.FromRgb(134, 239, 172), new Point(0.5, 0), new Point(0.5, 1));
+                background = ThemeGradient("BracketWinnerStartBrush", "BracketWinnerEndBrush", Color.FromRgb(240, 253, 244), Color.FromRgb(134, 239, 172));
             }
             else
             {
-                background = new LinearGradientBrush(Color.FromRgb(236, 245, 255), Color.FromRgb(122, 171, 242), new Point(0.5, 0), new Point(0.5, 1));
+                background = ThemeGradient("BracketDefaultStartBrush", "BracketDefaultEndBrush", Color.FromRgb(236, 245, 255), Color.FromRgb(122, 171, 242));
             }
 
             return new Border
             {
                 Background = background,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(91, 143, 231)),
+                BorderBrush = ThemeBrush("BracketRowBorderBrush", new SolidColorBrush(Color.FromRgb(91, 143, 231))),
                 BorderThickness = isTop ? new Thickness(0, 0, 0, 1) : new Thickness(0, 1, 0, 0),
                 Child = grid
             };
@@ -326,7 +326,7 @@ namespace Tournaments.WPF.Views
                 Y1 = y1,
                 X2 = x2,
                 Y2 = y2,
-                Stroke = new SolidColorBrush(Color.FromRgb(58, 106, 214)),
+                Stroke = ThemeBrush("BracketConnectorBrush", new SolidColorBrush(Color.FromRgb(58, 106, 214))),
                 StrokeThickness = 2,
                 SnapsToDevicePixels = true
             });
@@ -386,6 +386,16 @@ namespace Tournaments.WPF.Views
         private int GetFinalRoundIndex()
         {
             return Math.Max(0, _currentRoundCount - 1);
+        }
+
+        private static Brush ThemeBrush(string key, Brush fallback)
+        {
+            return ThemeManager.GetBrush(key, fallback);
+        }
+
+        private static LinearGradientBrush ThemeGradient(string startKey, string endKey, Color fallbackStart, Color fallbackEnd)
+        {
+            return ThemeManager.CreateVerticalGradientBrush(startKey, endKey, fallbackStart, fallbackEnd);
         }
     }
 }

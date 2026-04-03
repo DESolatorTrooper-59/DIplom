@@ -18,6 +18,10 @@ namespace Tournaments.WPF.Views
         private bool _isConnecting;
         private bool _isPasswordVisible;
         private bool _isUpdatingPasswordFields;
+        private string _loginMessage;
+        private bool _isLoginMessageError = true;
+        private string _sqlMessage;
+        private bool _isSqlMessageError = true;
 
         public LoginWindow()
         {
@@ -25,6 +29,7 @@ namespace Tournaments.WPF.Views
             Loaded += LoginWindow_Loaded;
             _sqlConnectionService = SqlServerConnectionService.Instance;
             SwitchMode(false);
+            UpdateThemeToggleState();
 
             try
             {
@@ -95,6 +100,11 @@ namespace Tournaments.WPF.Views
             SwitchMode(false);
             ActivateTestMode(true);
             LoginTextBox.Focus();
+        }
+
+        private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyTheme(ThemeManager.CurrentTheme == AppTheme.Light ? AppTheme.Dark : AppTheme.Light);
         }
 
         private void SqlModeButton_Click(object sender, RoutedEventArgs e)
@@ -196,6 +206,13 @@ namespace Tournaments.WPF.Views
             Application.Current.Shutdown();
         }
 
+        private void ApplyTheme(AppTheme theme)
+        {
+            ThemeManager.ApplyTheme(theme);
+            UpdateThemeToggleState();
+            RefreshThemeSensitiveVisuals();
+        }
+
         private void TogglePasswordVisibility_Click(object sender, RoutedEventArgs e)
         {
             UpdatePasswordVisibility(!_isPasswordVisible);
@@ -264,6 +281,22 @@ namespace Tournaments.WPF.Views
         private string GetLoginPassword()
         {
             return _isPasswordVisible ? PasswordVisibleTextBox.Text : PasswordTextBox.Password;
+        }
+
+        private void UpdateThemeToggleState()
+        {
+            bool isLightTheme = ThemeManager.CurrentTheme == AppTheme.Light;
+            ApplyThemeBadgeState(ThemeToggleBadge, ThemeToggleIcon);
+            ThemeToggleIcon.Text = isLightTheme ? "☀" : "☾";
+            ThemeToggleButton.ToolTip = isLightTheme
+                ? "Светлая тема активна. Нажмите, чтобы включить тёмную."
+                : "Тёмная тема активна. Нажмите, чтобы включить светлую.";
+        }
+
+        private void RefreshThemeSensitiveVisuals()
+        {
+            ApplyMessageState(LoginMessageContainer, LoginMessageText, _loginMessage, _isLoginMessageError);
+            ApplyMessageState(SqlMessageContainer, SqlMessageText, _sqlMessage, _isSqlMessageError);
         }
 
         private void UpdatePasswordVisibility(bool isVisible)
@@ -444,11 +477,15 @@ namespace Tournaments.WPF.Views
 
         private void SetLoginMessage(string message, bool isError = true)
         {
+            _loginMessage = message;
+            _isLoginMessageError = isError;
             ApplyMessageState(LoginMessageContainer, LoginMessageText, message, isError);
         }
 
         private void SetSqlMessage(string message, bool isError = true)
         {
+            _sqlMessage = message;
+            _isSqlMessageError = isError;
             ApplyMessageState(SqlMessageContainer, SqlMessageText, message, isError);
         }
 
@@ -465,15 +502,28 @@ namespace Tournaments.WPF.Views
 
             if (isError)
             {
-                container.Background = new SolidColorBrush(Color.FromRgb(254, 228, 226));
-                container.BorderBrush = new SolidColorBrush(Color.FromRgb(254, 202, 202));
-                textBlock.Foreground = new SolidColorBrush(Color.FromRgb(180, 35, 24));
+                container.Background = ThemeManager.GetBrush("MessageErrorBackgroundBrush", new SolidColorBrush(Color.FromRgb(254, 228, 226)));
+                container.BorderBrush = ThemeManager.GetBrush("MessageErrorBorderBrush", new SolidColorBrush(Color.FromRgb(254, 202, 202)));
+                textBlock.Foreground = ThemeManager.GetBrush("MessageErrorForegroundBrush", new SolidColorBrush(Color.FromRgb(180, 35, 24)));
                 return;
             }
 
-            container.Background = new SolidColorBrush(Color.FromRgb(220, 252, 231));
-            container.BorderBrush = new SolidColorBrush(Color.FromRgb(187, 247, 208));
-            textBlock.Foreground = new SolidColorBrush(Color.FromRgb(22, 101, 52));
+            container.Background = ThemeManager.GetBrush("MessageSuccessBackgroundBrush", new SolidColorBrush(Color.FromRgb(220, 252, 231)));
+            container.BorderBrush = ThemeManager.GetBrush("MessageSuccessBorderBrush", new SolidColorBrush(Color.FromRgb(187, 247, 208)));
+            textBlock.Foreground = ThemeManager.GetBrush("MessageSuccessForegroundBrush", new SolidColorBrush(Color.FromRgb(22, 101, 52)));
+        }
+
+        private static void ApplyThemeBadgeState(Border badge, TextBlock icon)
+        {
+            badge.Background = ThemeManager.GetBrush(
+                "ThemeToggleBackgroundBrush",
+                Brushes.Transparent);
+            badge.BorderBrush = ThemeManager.GetBrush(
+                "ThemeToggleBorderBrush",
+                Brushes.Transparent);
+            icon.Foreground = ThemeManager.GetBrush(
+                "ThemeToggleIconBrush",
+                Brushes.Black);
         }
     }
 }

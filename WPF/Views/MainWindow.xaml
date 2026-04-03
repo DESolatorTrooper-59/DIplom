@@ -5,22 +5,22 @@
         Width="1440"
         Height="860"
         WindowStartupLocation="CenterScreen">
-  <Grid>
+  <Grid Background="{DynamicResource SurfaceBrush}">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="280" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Background="{StaticResource PanelBrush}">
+    <Border Grid.Column="0" Background="{DynamicResource PanelBrush}">
       <DockPanel Margin="20">
         <StackPanel DockPanel.Dock="Top">
           <TextBlock Text="Tournament Control"
-                     Foreground="White"
+                     Foreground="{DynamicResource PanelTextBrush}"
                      FontSize="24"
                      FontWeight="Bold" />
           <TextBlock x:Name="UserText"
                      Margin="0,10,0,24"
-                     Foreground="#FFD9E2EC"
+                     Foreground="{DynamicResource PanelMutedTextBrush}"
                      TextWrapping="Wrap" />
         </StackPanel>
 
@@ -33,7 +33,7 @@
         <ListBox x:Name="EntitiesList"
                  Background="Transparent"
                  BorderThickness="0"
-                 Foreground="White"
+                 Foreground="{DynamicResource PanelTextBrush}"
                  SelectionChanged="EntitiesList_SelectionChanged">
           <ListBox.ItemContainerStyle>
             <Style TargetType="ListBoxItem">
@@ -50,10 +50,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                       <Trigger Property="IsSelected" Value="True">
-                        <Setter TargetName="Root" Property="Background" Value="#FF166088" />
+                        <Setter TargetName="Root" Property="Background" Value="{DynamicResource PanelItemSelectedBrush}" />
                       </Trigger>
                       <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="Root" Property="Background" Value="#223D5A80" />
+                        <Setter TargetName="Root" Property="Background" Value="{DynamicResource PanelItemHoverBrush}" />
                       </Trigger>
                     </ControlTemplate.Triggers>
                   </ControlTemplate>
@@ -65,7 +65,7 @@
       </DockPanel>
     </Border>
 
-    <Grid Grid.Column="1" Margin="20">
+    <Grid Grid.Column="1" Margin="20" Background="{DynamicResource SurfaceBrush}">
       <ContentControl x:Name="PageHost" />
     </Grid>
   </Grid>

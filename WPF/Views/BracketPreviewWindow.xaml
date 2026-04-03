@@ -5,9 +5,9 @@
         Height="860"
         MinWidth="980"
         MinHeight="620"
-        Background="#FFF5F8FC"
+        Background="{DynamicResource SurfaceBrush}"
         WindowStartupLocation="CenterOwner">
-  <Grid Margin="20">
+  <Grid Margin="20" Background="{DynamicResource SurfaceBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -15,35 +15,35 @@
     </Grid.RowDefinitions>
 
     <StackPanel>
-      <TextBlock x:Name="TitleText" FontSize="30" FontWeight="Bold" Foreground="#FF102A43" />
+      <TextBlock x:Name="TitleText" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
       <TextBlock x:Name="SubtitleText"
                  Margin="0,8,0,0"
-                 Foreground="#FF486581"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
                  TextWrapping="Wrap" />
     </StackPanel>
 
     <Border Grid.Row="1"
             Margin="0,18,0,0"
             Padding="16"
-            Background="White"
-            BorderBrush="#FFD9E2EC"
+            Background="{DynamicResource CardBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="14">
       <TextBlock x:Name="SummaryText"
-                 Foreground="#FF486581"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
                  TextWrapping="Wrap" />
     </Border>
 
     <Border Grid.Row="2"
             Margin="0,18,0,0"
             Padding="16"
-            Background="White"
-            BorderBrush="#FFD9E2EC"
+            Background="{DynamicResource CardBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="14">
       <Grid>
         <TextBlock x:Name="EmptyStateText"
-                   Foreground="#FF486581"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
                    FontSize="16"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center"
@@ -52,7 +52,7 @@
                    Visibility="Collapsed" />
 
         <ScrollViewer x:Name="BracketScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-          <Canvas x:Name="BracketCanvas" Background="#FFF4F4FB" />
+          <Canvas x:Name="BracketCanvas" Background="{DynamicResource CanvasBackgroundBrush}" />
         </ScrollViewer>
       </Grid>
     </Border>

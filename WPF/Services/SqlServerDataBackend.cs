@@ -9,6 +9,9 @@ namespace Tournaments.WPF.Services
 {
     internal sealed class SqlServerDataBackend : IDataBackend
     {
+        private const string Player1IdColumn = "Player1ID";
+        private const string Player2IdColumn = "Player2ID";
+        private const string WinnerPlayerIdColumn = "WinnerPlayerID";
         private readonly string _connectionString;
         private readonly string _storageLabel;
         private readonly Dictionary<string, IReadOnlyCollection<string>> _columnCache = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
@@ -215,34 +218,35 @@ WHERE [MatchID] IN (
                     throw new InvalidOperationException("Выбранный турнир не найден.");
                 }
 
-                if (IsPlayerMode(GetTournamentParticipantMode(tournament)))
+                bool isPlayerMode = IsPlayerMode(GetTournamentParticipantMode(tournament));
+                if (isPlayerMode)
                 {
-                    throw new InvalidOperationException("В текущей схеме MS SQL Server сетка для турниров с игроками пока не поддерживается. Для этого нужна миграция таблицы Matches.");
+                    EnsurePlayerBracketColumns(connection, transaction);
                 }
 
-                List<int> orderedTeamIds = GetOrderedParticipantTeamIds(tournamentId, connection, transaction);
-                if (orderedTeamIds.Count < 2)
+                List<int> orderedParticipantIds = GetOrderedParticipantIds(tournamentId, isPlayerMode, connection, transaction);
+                if (orderedParticipantIds.Count < 2)
                 {
                     throw new InvalidOperationException("Для построения сетки нужно минимум два участника.");
                 }
 
                 RemoveGeneratedBracket(connection, transaction, tournamentId);
 
-                int bracketSize = NextPowerOfTwo(orderedTeamIds.Count);
+                int bracketSize = NextPowerOfTwo(orderedParticipantIds.Count);
                 int roundCount = (int)Math.Log(bracketSize, 2);
                 int[] seedPositions = BuildSeedPositions(bracketSize);
                 int?[] slots = new int?[bracketSize];
                 for (int index = 0; index < seedPositions.Length; index++)
                 {
                     int seed = seedPositions[index];
-                    if (seed <= orderedTeamIds.Count)
+                    if (seed <= orderedParticipantIds.Count)
                     {
-                        slots[index] = orderedTeamIds[seed - 1];
+                        slots[index] = orderedParticipantIds[seed - 1];
                     }
                 }
 
                 DateTime tournamentStartDate = Convert.ToDateTime(tournament["StartDate"]);
-                int matchNumber = 1;
+                int matchNumber = GetNextMatchNumber(connection, transaction, tournamentId);
                 int matchesInRound = bracketSize / 2;
                 int createdMatches = 0;
 
@@ -253,16 +257,20 @@ WHERE [MatchID] IN (
 
                     for (int matchIndex = 0; matchIndex < matchesInRound; matchIndex++)
                     {
-                        int? team1Id = roundIndex == 0 ? slots[matchIndex * 2] : (int?)null;
-                        int? team2Id = roundIndex == 0 ? slots[matchIndex * 2 + 1] : (int?)null;
+                        int? participant1Id = roundIndex == 0 ? slots[matchIndex * 2] : (int?)null;
+                        int? participant2Id = roundIndex == 0 ? slots[matchIndex * 2 + 1] : (int?)null;
+                        int? autoWinnerId = ResolveAutoAdvanceParticipantId(participant1Id, participant2Id);
                         Dictionary<string, object> matchValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                         {
                             ["TournamentID"] = tournamentId,
                             ["StageID"] = stageId,
                             ["MatchNumber"] = matchNumber++,
-                            ["Team1ID"] = team1Id,
-                            ["Team2ID"] = team2Id,
-                            ["WinnerTeamID"] = ResolveAutoAdvanceParticipantId(team1Id, team2Id),
+                            ["Team1ID"] = isPlayerMode ? null : (object)participant1Id,
+                            ["Team2ID"] = isPlayerMode ? null : (object)participant2Id,
+                            ["WinnerTeamID"] = isPlayerMode ? null : (object)autoWinnerId,
+                            [Player1IdColumn] = isPlayerMode ? (object)participant1Id : null,
+                            [Player2IdColumn] = isPlayerMode ? (object)participant2Id : null,
+                            [WinnerPlayerIdColumn] = isPlayerMode ? (object)autoWinnerId : null,
                             ["Team1Score"] = 0,
                             ["Team2Score"] = 0,
                             ["MatchDate"] = tournamentStartDate.AddDays(roundIndex),
@@ -295,9 +303,10 @@ WHERE [MatchID] IN (
             {
                 DataTable tournaments = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[Tournaments] WHERE [TournamentID] = @TournamentID", "Tournaments", command => AddParameter(command, "@TournamentID", tournamentId));
                 DataRow tournament = tournaments.Rows.Cast<DataRow>().FirstOrDefault();
-                if (tournament != null && IsPlayerMode(GetTournamentParticipantMode(tournament)))
+                bool isPlayerMode = tournament != null && IsPlayerMode(GetTournamentParticipantMode(tournament));
+                if (isPlayerMode)
                 {
-                    throw new InvalidOperationException("В текущей схеме MS SQL Server редактирование сетки турниров с игроками пока не поддерживается. Для этого нужна миграция таблицы Matches.");
+                    EnsurePlayerBracketColumns(connection, transaction);
                 }
 
                 List<SqlBracketRoundState> rounds = GetGeneratedBracketRounds(tournamentId, connection, transaction);
@@ -313,9 +322,13 @@ WHERE [MatchID] IN (
                 }
 
                 DataRow match = targetRound.Matches.First(row => AreEqual(row["MatchID"], request.MatchId));
-                List<int> availableTeams = GetOrderedParticipantTeamIds(tournamentId, connection, transaction);
-                int? team1Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team1Id, availableTeams) : ToNullableInt(match["Team1ID"]);
-                int? team2Id = targetRound.RoundIndex == 0 ? NormalizeBracketTeamId(request.Team2Id, availableTeams) : ToNullableInt(match["Team2ID"]);
+                List<int> availableTeams = GetOrderedParticipantIds(tournamentId, targetRound.IsPlayerMode, connection, transaction);
+                int? team1Id = targetRound.RoundIndex == 0
+                    ? NormalizeBracketTeamId(request.Team1Id, availableTeams)
+                    : GetParticipantId(match, targetRound.IsPlayerMode, 1);
+                int? team2Id = targetRound.RoundIndex == 0
+                    ? NormalizeBracketTeamId(request.Team2Id, availableTeams)
+                    : GetParticipantId(match, targetRound.IsPlayerMode, 2);
 
                 if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
                 {
@@ -338,8 +351,8 @@ WHERE [MatchID] IN (
                 }
 
                 string status = string.IsNullOrWhiteSpace(request.Status) ? "Scheduled" : request.Status.Trim();
-                match["Team1ID"] = team1Id.HasValue ? (object)team1Id.Value : DBNull.Value;
-                match["Team2ID"] = team2Id.HasValue ? (object)team2Id.Value : DBNull.Value;
+                SetParticipantId(match, targetRound.IsPlayerMode, 1, team1Id);
+                SetParticipantId(match, targetRound.IsPlayerMode, 2, team2Id);
                 match["Team1Score"] = request.Team1Score;
                 match["Team2Score"] = request.Team2Score;
                 match["BestOf"] = request.BestOf;
@@ -347,7 +360,7 @@ WHERE [MatchID] IN (
                 match["Status"] = status;
 
                 int? winnerTeamId = NormalizeWinnerTeamId(request.WinnerTeamId, team1Id, team2Id, status, request.Team1Score, request.Team2Score);
-                match["WinnerTeamID"] = winnerTeamId.HasValue ? (object)winnerTeamId.Value : DBNull.Value;
+                SetParticipantId(match, targetRound.IsPlayerMode, 3, winnerTeamId);
 
                 PropagateBracketState(rounds);
                 PersistBracketMatches(connection, transaction, rounds);
@@ -394,6 +407,46 @@ WHERE [MatchID] IN (
                 configure?.Invoke(command);
                 command.ExecuteNonQuery();
             }
+        }
+
+        private void EnsurePlayerBracketColumns(SqlConnection connection, SqlTransaction transaction)
+        {
+            bool changed = false;
+            changed |= EnsureNullableIntColumn(connection, transaction, "Matches", Player1IdColumn);
+            changed |= EnsureNullableIntColumn(connection, transaction, "Matches", Player2IdColumn);
+            changed |= EnsureNullableIntColumn(connection, transaction, "Matches", WinnerPlayerIdColumn);
+
+            if (changed)
+            {
+                InvalidateSchemaCache("Matches");
+            }
+        }
+
+        private bool EnsureNullableIntColumn(SqlConnection connection, SqlTransaction transaction, string tableName, string columnName)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                string safeTableName = EscapeIdentifier(tableName);
+                string safeColumnName = EscapeIdentifier(columnName);
+
+                command.CommandText = $@"
+IF COL_LENGTH('dbo.{safeTableName}', '{safeColumnName}') IS NULL
+BEGIN
+    EXEC('ALTER TABLE [dbo].[{safeTableName}] ADD [{safeColumnName}] INT NULL');
+    SELECT CAST(1 AS bit);
+END
+ELSE
+BEGIN
+    SELECT CAST(0 AS bit);
+END";
+                return Convert.ToBoolean(command.ExecuteScalar());
+            }
+        }
+
+        private void InvalidateSchemaCache(string tableName)
+        {
+            _columnCache.Remove(tableName);
         }
 
         private int? ReadNextIdentityValue(string tableName, SqlConnection connection, SqlTransaction transaction)
@@ -460,6 +513,17 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
             };
 
             return InsertRow(connection, transaction, "TournamentStages", values, true, true);
+        }
+
+        private int GetNextMatchNumber(SqlConnection connection, SqlTransaction transaction, int tournamentId)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT ISNULL(MAX([MatchNumber]), 0) + 1 FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID";
+                AddParameter(command, "@TournamentID", tournamentId);
+                return Convert.ToInt32(command.ExecuteScalar());
+            }
         }
 
         private int InsertRow(SqlConnection connection, SqlTransaction transaction, string tableName, IDictionary<string, object> values, bool includeNullValues, bool returnIdentity)
@@ -587,21 +651,29 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
             return whereParts;
         }
 
-        private List<int> GetOrderedParticipantTeamIds(int tournamentId, SqlConnection connection, SqlTransaction transaction)
+        private List<int> GetOrderedParticipantIds(int tournamentId, bool isPlayerMode, SqlConnection connection, SqlTransaction transaction)
         {
             DataTable participants = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", "TournamentParticipants", command => AddParameter(command, "@TournamentID", tournamentId));
+            string columnName = isPlayerMode ? "PlayerID" : "TeamID";
             return participants.Rows
                 .Cast<DataRow>()
-                .Where(row => row["TeamID"] != DBNull.Value)
+                .Where(row => row.Table.Columns.Contains(columnName) && row[columnName] != DBNull.Value)
                 .OrderBy(row => row["Seed"] == DBNull.Value ? 1 : 0)
                 .ThenBy(row => row["Seed"] == DBNull.Value ? int.MaxValue : Convert.ToInt32(row["Seed"]))
-                .ThenBy(row => Convert.ToInt32(row["TeamID"]))
-                .Select(row => Convert.ToInt32(row["TeamID"]))
+                .ThenBy(row => Convert.ToInt32(row[columnName]))
+                .Select(row => Convert.ToInt32(row[columnName]))
                 .ToList();
         }
 
         private void RemoveGeneratedBracket(SqlConnection connection, SqlTransaction transaction, int tournamentId)
         {
+            ExecuteNonQuery(connection, transaction, @"DELETE ST
+FROM [dbo].[Streams] ST
+INNER JOIN [dbo].[Matches] M ON M.[MatchID] = ST.[MatchID]
+INNER JOIN [dbo].[TournamentStages] S ON S.[StageID] = M.[StageID]
+WHERE S.[TournamentID] = @TournamentID
+  AND S.[StageName] LIKE 'Bracket - %'", command => AddParameter(command, "@TournamentID", tournamentId));
+
             ExecuteNonQuery(connection, transaction, @"DELETE M
 FROM [dbo].[Matches] M
 INNER JOIN [dbo].[TournamentStages] S ON S.[StageID] = M.[StageID]
@@ -613,6 +685,7 @@ WHERE S.[TournamentID] = @TournamentID
 
         private List<SqlBracketRoundState> GetGeneratedBracketRounds(int tournamentId, SqlConnection connection, SqlTransaction transaction)
         {
+            bool isPlayerMode = IsPlayerMode(GetTournamentParticipantMode(tournamentId, connection, transaction));
             DataTable stages = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID", "TournamentStages", command => AddParameter(command, "@TournamentID", tournamentId));
             DataTable matches = ExecuteTableQuery(connection, transaction, "SELECT * FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID", "Matches", command => AddParameter(command, "@TournamentID", tournamentId));
 
@@ -629,7 +702,8 @@ WHERE S.[TournamentID] = @TournamentID
                 SqlBracketRoundState round = new SqlBracketRoundState
                 {
                     RoundIndex = roundIndex,
-                    Stage = stage
+                    Stage = stage,
+                    IsPlayerMode = isPlayerMode
                 };
 
                 foreach (DataRow match in matches.Rows.Cast<DataRow>().Where(row => AreEqual(row["StageID"], stage["StageID"])).OrderBy(row => ReadInt(row["MatchNumber"], 0)))
@@ -661,9 +735,10 @@ WHERE S.[TournamentID] = @TournamentID
                 List<DataRow> currentRoundMatches = rounds[roundIndex].Matches;
                 for (int matchIndex = 0; matchIndex < currentRoundMatches.Count; matchIndex++)
                 {
-                    int? team1Id = matchIndex * 2 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2]) : (int?)null;
-                    int? team2Id = matchIndex * 2 + 1 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2 + 1]) : (int?)null;
-                    ApplyPropagatedTeams(currentRoundMatches[matchIndex], team1Id, team2Id);
+                    bool isPlayerMode = rounds[roundIndex].IsPlayerMode;
+                    int? team1Id = matchIndex * 2 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2], isPlayerMode) : (int?)null;
+                    int? team2Id = matchIndex * 2 + 1 < previousRoundMatches.Count ? ResolveAdvancingTeamId(previousRoundMatches[matchIndex * 2 + 1], isPlayerMode) : (int?)null;
+                    ApplyPropagatedTeams(currentRoundMatches[matchIndex], isPlayerMode, team1Id, team2Id);
                 }
             }
         }
@@ -674,59 +749,57 @@ WHERE S.[TournamentID] = @TournamentID
             {
                 foreach (DataRow match in round.Matches)
                 {
-                    ExecuteNonQuery(connection, transaction, @"UPDATE [dbo].[Matches]
-SET [Team1ID] = @Team1ID,
-    [Team2ID] = @Team2ID,
-    [WinnerTeamID] = @WinnerTeamID,
-    [Team1Score] = @Team1Score,
-    [Team2Score] = @Team2Score,
-    [MatchDate] = @MatchDate,
-    [BestOf] = @BestOf,
-    [Status] = @Status
-WHERE [MatchID] = @MatchID", command =>
+                    Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                     {
-                        AddParameter(command, "@Team1ID", ToNullableInt(match["Team1ID"]));
-                        AddParameter(command, "@Team2ID", ToNullableInt(match["Team2ID"]));
-                        AddParameter(command, "@WinnerTeamID", ToNullableInt(match["WinnerTeamID"]));
-                        AddParameter(command, "@Team1Score", ReadInt(match["Team1Score"], 0));
-                        AddParameter(command, "@Team2Score", ReadInt(match["Team2Score"], 0));
-                        AddParameter(command, "@MatchDate", NormalizeDateValue(match["MatchDate"]));
-                        AddParameter(command, "@BestOf", ReadInt(match["BestOf"], 3));
-                        AddParameter(command, "@Status", Convert.ToString(match["Status"]));
-                        AddParameter(command, "@MatchID", ReadInt(match["MatchID"], 0));
+                        ["Team1ID"] = round.IsPlayerMode ? null : (object)GetParticipantId(match, false, 1),
+                        ["Team2ID"] = round.IsPlayerMode ? null : (object)GetParticipantId(match, false, 2),
+                        ["WinnerTeamID"] = round.IsPlayerMode ? null : (object)GetParticipantId(match, false, 3),
+                        [Player1IdColumn] = round.IsPlayerMode ? (object)GetParticipantId(match, true, 1) : null,
+                        [Player2IdColumn] = round.IsPlayerMode ? (object)GetParticipantId(match, true, 2) : null,
+                        [WinnerPlayerIdColumn] = round.IsPlayerMode ? (object)GetParticipantId(match, true, 3) : null,
+                        ["Team1Score"] = ReadInt(match["Team1Score"], 0),
+                        ["Team2Score"] = ReadInt(match["Team2Score"], 0),
+                        ["MatchDate"] = NormalizeDateValue(match["MatchDate"]),
+                        ["BestOf"] = ReadInt(match["BestOf"], 3),
+                        ["Status"] = Convert.ToString(match["Status"])
+                    };
+
+                    UpdateRow(connection, transaction, "Matches", new[] { "MatchID" }, values, new Dictionary<string, object>
+                    {
+                        ["MatchID"] = ReadInt(match["MatchID"], 0)
                     });
                 }
             }
         }
 
-        private static void ApplyPropagatedTeams(DataRow match, int? team1Id, int? team2Id)
+        private static void ApplyPropagatedTeams(DataRow match, bool isPlayerMode, int? team1Id, int? team2Id)
         {
-            int? currentTeam1Id = ToNullableInt(match["Team1ID"]);
-            int? currentTeam2Id = ToNullableInt(match["Team2ID"]);
+            int? currentTeam1Id = GetParticipantId(match, isPlayerMode, 1);
+            int? currentTeam2Id = GetParticipantId(match, isPlayerMode, 2);
             bool changed = currentTeam1Id != team1Id || currentTeam2Id != team2Id;
-            match["Team1ID"] = team1Id.HasValue ? (object)team1Id.Value : DBNull.Value;
-            match["Team2ID"] = team2Id.HasValue ? (object)team2Id.Value : DBNull.Value;
+            SetParticipantId(match, isPlayerMode, 1, team1Id);
+            SetParticipantId(match, isPlayerMode, 2, team2Id);
 
             if (changed)
             {
-                match["WinnerTeamID"] = DBNull.Value;
+                SetParticipantId(match, isPlayerMode, 3, null);
                 match["Team1Score"] = 0;
                 match["Team2Score"] = 0;
                 match["Status"] = "Scheduled";
                 return;
             }
 
-            if (!HasCompatibleWinner(match, team1Id, team2Id))
+            if (!HasCompatibleWinner(match, isPlayerMode, team1Id, team2Id))
             {
-                match["WinnerTeamID"] = DBNull.Value;
+                SetParticipantId(match, isPlayerMode, 3, null);
             }
         }
 
-        private static int? ResolveAdvancingTeamId(DataRow sourceMatch)
+        private static int? ResolveAdvancingTeamId(DataRow sourceMatch, bool isPlayerMode)
         {
-            int? team1Id = ToNullableInt(sourceMatch["Team1ID"]);
-            int? team2Id = ToNullableInt(sourceMatch["Team2ID"]);
-            int? winnerTeamId = ToNullableInt(sourceMatch["WinnerTeamID"]);
+            int? team1Id = GetParticipantId(sourceMatch, isPlayerMode, 1);
+            int? team2Id = GetParticipantId(sourceMatch, isPlayerMode, 2);
+            int? winnerTeamId = GetParticipantId(sourceMatch, isPlayerMode, 3);
             if (winnerTeamId.HasValue && (winnerTeamId == team1Id || winnerTeamId == team2Id))
             {
                 return winnerTeamId;
@@ -753,9 +826,9 @@ WHERE [MatchID] = @MatchID", command =>
             return null;
         }
 
-        private static bool HasCompatibleWinner(DataRow match, int? team1Id, int? team2Id)
+        private static bool HasCompatibleWinner(DataRow match, bool isPlayerMode, int? team1Id, int? team2Id)
         {
-            int? winnerTeamId = ToNullableInt(match["WinnerTeamID"]);
+            int? winnerTeamId = GetParticipantId(match, isPlayerMode, 3);
             return !winnerTeamId.HasValue || winnerTeamId == team1Id || winnerTeamId == team2Id;
         }
 
@@ -819,6 +892,53 @@ WHERE [MatchID] = @MatchID", command =>
             return null;
         }
 
+        private static int? GetParticipantId(DataRow row, bool isPlayerMode, int slotIndex)
+        {
+            string preferredColumn = GetParticipantColumnName(isPlayerMode, slotIndex);
+            if (row.Table.Columns.Contains(preferredColumn) && row[preferredColumn] != DBNull.Value)
+            {
+                return Convert.ToInt32(row[preferredColumn]);
+            }
+
+            string fallbackColumn = GetParticipantColumnName(!isPlayerMode, slotIndex);
+            if (row.Table.Columns.Contains(fallbackColumn) && row[fallbackColumn] != DBNull.Value)
+            {
+                return Convert.ToInt32(row[fallbackColumn]);
+            }
+
+            return null;
+        }
+
+        private static void SetParticipantId(DataRow row, bool isPlayerMode, int slotIndex, int? participantId)
+        {
+            string activeColumn = GetParticipantColumnName(isPlayerMode, slotIndex);
+            if (row.Table.Columns.Contains(activeColumn))
+            {
+                row[activeColumn] = participantId.HasValue ? (object)participantId.Value : DBNull.Value;
+            }
+
+            string inactiveColumn = GetParticipantColumnName(!isPlayerMode, slotIndex);
+            if (row.Table.Columns.Contains(inactiveColumn))
+            {
+                row[inactiveColumn] = DBNull.Value;
+            }
+        }
+
+        private static string GetParticipantColumnName(bool isPlayerMode, int slotIndex)
+        {
+            switch (slotIndex)
+            {
+                case 1:
+                    return isPlayerMode ? Player1IdColumn : "Team1ID";
+                case 2:
+                    return isPlayerMode ? Player2IdColumn : "Team2ID";
+                case 3:
+                    return isPlayerMode ? WinnerPlayerIdColumn : "WinnerTeamID";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(slotIndex));
+            }
+        }
+
         private static string GetTournamentParticipantMode(DataRow tournament)
         {
             if (tournament == null || !tournament.Table.Columns.Contains("ParticipantMode") || tournament["ParticipantMode"] == DBNull.Value)
@@ -828,6 +948,18 @@ WHERE [MatchID] = @MatchID", command =>
 
             string mode = Convert.ToString(tournament["ParticipantMode"]);
             return string.IsNullOrWhiteSpace(mode) ? "Команды" : mode;
+        }
+
+        private string GetTournamentParticipantMode(int tournamentId, SqlConnection connection, SqlTransaction transaction)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = "SELECT [ParticipantMode] FROM [dbo].[Tournaments] WHERE [TournamentID] = @TournamentID";
+                AddParameter(command, "@TournamentID", tournamentId);
+                object result = command.ExecuteScalar();
+                return result == null || result == DBNull.Value ? "Команды" : Convert.ToString(result);
+            }
         }
 
         private static bool IsPlayerMode(string participantMode)
@@ -951,6 +1083,8 @@ WHERE [MatchID] = @MatchID", command =>
             public int RoundIndex { get; set; }
 
             public DataRow Stage { get; set; }
+
+            public bool IsPlayerMode { get; set; }
 
             public List<DataRow> Matches { get; } = new List<DataRow>();
         }

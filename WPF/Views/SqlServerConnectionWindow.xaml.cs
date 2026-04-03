@@ -88,15 +88,15 @@ namespace Tournaments.WPF.Views
 
             if (isError)
             {
-                MessageContainer.Background = new SolidColorBrush(Color.FromRgb(254, 228, 226));
-                MessageContainer.BorderBrush = new SolidColorBrush(Color.FromRgb(254, 202, 202));
-                MessageText.Foreground = new SolidColorBrush(Color.FromRgb(180, 35, 24));
+                MessageContainer.Background = ThemeManager.GetBrush("MessageErrorBackgroundBrush", new SolidColorBrush(Color.FromRgb(254, 228, 226)));
+                MessageContainer.BorderBrush = ThemeManager.GetBrush("MessageErrorBorderBrush", new SolidColorBrush(Color.FromRgb(254, 202, 202)));
+                MessageText.Foreground = ThemeManager.GetBrush("MessageErrorForegroundBrush", new SolidColorBrush(Color.FromRgb(180, 35, 24)));
                 return;
             }
 
-            MessageContainer.Background = new SolidColorBrush(Color.FromRgb(220, 252, 231));
-            MessageContainer.BorderBrush = new SolidColorBrush(Color.FromRgb(187, 247, 208));
-            MessageText.Foreground = new SolidColorBrush(Color.FromRgb(22, 101, 52));
+            MessageContainer.Background = ThemeManager.GetBrush("MessageSuccessBackgroundBrush", new SolidColorBrush(Color.FromRgb(220, 252, 231)));
+            MessageContainer.BorderBrush = ThemeManager.GetBrush("MessageSuccessBorderBrush", new SolidColorBrush(Color.FromRgb(187, 247, 208)));
+            MessageText.Foreground = ThemeManager.GetBrush("MessageSuccessForegroundBrush", new SolidColorBrush(Color.FromRgb(22, 101, 52)));
         }
     }
 }

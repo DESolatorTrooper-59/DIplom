@@ -212,7 +212,7 @@ namespace Tournaments.WPF.Services
 
                 DataTable matches = GetRequiredTable("Matches");
                 DateTime tournamentStartDate = Convert.ToDateTime(tournament["StartDate"]);
-                int matchNumber = 1;
+                int matchNumber = GetNextMatchNumber(tournamentId);
                 int matchesInRound = bracketSize / 2;
                 int createdMatches = 0;
 
@@ -620,19 +620,37 @@ namespace Tournaments.WPF.Services
             SeedRow("GameTitles", new Dictionary<string, object>
             {
                 ["GameID"] = 2,
-                ["GameName"] = "Dota 2",
-                ["Developer"] = "Valve",
-                ["ReleaseYear"] = 2013,
-                ["MaxPlayersPerTeam"] = 5
+                ["GameName"] = "Tiberium Wars",
+                ["Developer"] = "EA LA",
+                ["ReleaseYear"] = 2007,
+                ["MaxPlayersPerTeam"] = 4
             });
 
             SeedRow("GameTitles", new Dictionary<string, object>
             {
                 ["GameID"] = 3,
-                ["GameName"] = "VALORANT",
-                ["Developer"] = "Riot Games",
-                ["ReleaseYear"] = 2020,
-                ["MaxPlayersPerTeam"] = 5
+                ["GameName"] = "Kane's Wrath",
+                ["Developer"] = "EA LA",
+                ["ReleaseYear"] = 2008,
+                ["MaxPlayersPerTeam"] = 4
+            });
+
+            SeedRow("GameTitles", new Dictionary<string, object>
+            {
+                ["GameID"] = 4,
+                ["GameName"] = "Red Alert 2",
+                ["Developer"] = "Westwood Studios, EA Pacific",
+                ["ReleaseYear"] = 2000,
+                ["MaxPlayersPerTeam"] = 4
+            });
+
+            SeedRow("GameTitles", new Dictionary<string, object>
+            {
+                ["GameID"] = 5,
+                ["GameName"] = "Red Alert 3",
+                ["Developer"] = "EA LA",
+                ["ReleaseYear"] = 2008,
+                ["MaxPlayersPerTeam"] = 4
             });
 
             SeedTeam(1, "NAVI", new DateTime(2009, 12, 17), "Ukraine", "B1ad3", -60);
@@ -648,14 +666,14 @@ namespace Tournaments.WPF.Services
 
             SeedPlayer(1, "s1mple", "Oleksandr Kostyliev", "Ukraine", new DateTime(1997, 10, 2));
             SeedPlayer(2, "donk", "Danil Kryshkovets", "Russia", new DateTime(2007, 1, 25));
-            SeedPlayer(3, "fame", "Pyotr Bolyshev", "Russia", new DateTime(2003, 3, 3));
-            SeedPlayer(4, "NiKo", "Nikola Kovac", "Bosnia and Herzegovina", new DateTime(1997, 2, 16));
-            SeedPlayer(5, "ropz", "Robin Kool", "Estonia", new DateTime(1999, 12, 22));
-            SeedPlayer(6, "xertioN", "Dorian Berman", "Israel", new DateTime(2004, 7, 22));
-            SeedPlayer(7, "ZywOo", "Mathieu Herbaut", "France", new DateTime(2000, 11, 9));
-            SeedPlayer(8, "electroNic", "Denis Sharipov", "Russia", new DateTime(1998, 9, 2));
-            SeedPlayer(9, "kataomi", "Vladislav Semenov", "Russia", new DateTime(1999, 1, 1));
-            SeedPlayer(10, "bzm", "Bozhidar Bogdanov", "Bulgaria", new DateTime(2005, 1, 1));
+            SeedPlayer(3, "DESolatorTrooper", "Sergey Kornev", "Russia", new DateTime(2005, 6, 21));
+            SeedPlayer(4, "Bookuha", "Andrey", "Ukraine", new DateTime(2000, 1, 1));
+            SeedPlayer(5, "Bikerushownz", "Скрыто", "United Kingdom", new DateTime(2000, 1, 1));
+            SeedPlayer(6, "Hulk", "Ivan", "Russia", new DateTime(2000, 1, 1));
+            SeedPlayer(7, "Mah_Boi", "Скрыто", "Blocked", new DateTime(2000, 1, 1));
+            SeedPlayer(8, "Lamas", "Скрыто", "USA", new DateTime(2026, 4, 1));
+            SeedPlayer(9, "Rildcom", "Скрыто", "Australia", new DateTime(2000, 1, 1));
+            SeedPlayer(10, "Svenson", "Скрыто", "Nigerlands", new DateTime(2000, 1, 1));
 
             SeedTeamPlayer(1, 1, 1, "AWPer", -6);
             SeedTeamPlayer(2, 2, 2, "Rifler", -5);
@@ -692,31 +710,61 @@ namespace Tournaments.WPF.Services
             SeedRow("Tournaments", new Dictionary<string, object>
             {
                 ["TournamentID"] = 1,
-                ["TournamentName"] = "Spring Invitational",
+                ["TournamentName"] = "Spring Invitational 2026",
                 ["GameID"] = 1,
-                ["StartDate"] = DateTime.Today.AddDays(-3),
-                ["EndDate"] = DateTime.Today.AddDays(1),
-                ["PrizePool"] = 250000m,
+                ["StartDate"] = new DateTime(2026, 5, 10),
+                ["EndDate"] = new DateTime(2026, 5, 12),
+                ["PrizePool"] = 150000m,
                 ["Organizer"] = "admin",
                 ["Location"] = "Moscow",
                 ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 8,
+                ["MaxTeams"] = 2,
                 ["ParticipantMode"] = "Команды"
             });
 
             SeedRow("Tournaments", new Dictionary<string, object>
             {
                 ["TournamentID"] = 2,
-                ["TournamentName"] = "Autumn Masters",
-                ["GameID"] = 2,
-                ["StartDate"] = DateTime.Today.AddDays(20),
-                ["EndDate"] = DateTime.Today.AddDays(24),
-                ["PrizePool"] = 500000m,
-                ["Organizer"] = "admin",
-                ["Location"] = "Belgrade",
+                ["TournamentName"] = "WEC Season 1",
+                ["GameID"] = 3,
+                ["StartDate"] = new DateTime(2026, 2, 1),
+                ["EndDate"] = DBNull.Value,
+                ["PrizePool"] = 1000m,
+                ["Organizer"] = "Bikerushownz",
+                ["Location"] = "Online",
+                ["FormatType"] = "League",
+                ["MaxTeams"] = 8,
+                ["ParticipantMode"] = "Игроки"
+            });
+
+            SeedRow("Tournaments", new Dictionary<string, object>
+            {
+                ["TournamentID"] = 3,
+                ["TournamentName"] = "WEC Season 2",
+                ["GameID"] = 3,
+                ["StartDate"] = new DateTime(2026, 3, 1),
+                ["EndDate"] = DBNull.Value,
+                ["PrizePool"] = 1000m,
+                ["Organizer"] = "Bikerushownz",
+                ["Location"] = "Online",
+                ["FormatType"] = "League",
+                ["MaxTeams"] = 24,
+                ["ParticipantMode"] = "Игроки"
+            });
+
+            SeedRow("Tournaments", new Dictionary<string, object>
+            {
+                ["TournamentID"] = 4,
+                ["TournamentName"] = "Red Champions",
+                ["GameID"] = 5,
+                ["StartDate"] = new DateTime(2024, 7, 5),
+                ["EndDate"] = new DateTime(2024, 8, 16),
+                ["PrizePool"] = 1m,
+                ["Organizer"] = "MoscowCypersports",
+                ["Location"] = "Online",
                 ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 4,
-                ["ParticipantMode"] = "Команды"
+                ["MaxTeams"] = 24,
+                ["ParticipantMode"] = "Игроки"
             });
 
             SeedRow("TournamentStages", new Dictionary<string, object>
@@ -728,27 +776,19 @@ namespace Tournaments.WPF.Services
                 ["BracketType"] = "Winner"
             });
 
-            SeedRow("TournamentStages", new Dictionary<string, object>
-            {
-                ["StageID"] = 2,
-                ["TournamentID"] = 2,
-                ["StageName"] = "Main Event",
-                ["StageOrder"] = 1,
-                ["BracketType"] = "Winner"
-            });
-
             SeedTournamentParticipant(1, 1, 1, 1);
             SeedTournamentParticipant(2, 1, 2, 2);
-            SeedTournamentParticipant(3, 1, 3, 3);
-            SeedTournamentParticipant(4, 1, 4, 4);
-            SeedTournamentParticipant(5, 1, 5, 5);
-            SeedTournamentParticipant(6, 1, 6, 6);
-            SeedTournamentParticipant(7, 1, 7, 7);
-            SeedTournamentParticipant(8, 1, 8, 8);
-            SeedTournamentParticipant(9, 2, 3, 1);
-            SeedTournamentParticipant(10, 2, 5, 2);
-            SeedTournamentParticipant(11, 2, 9, 3);
-            SeedTournamentParticipant(12, 2, 10, 4);
+            SeedTournamentParticipant(3, 2, null, 1, 3);
+            SeedTournamentParticipant(4, 2, null, 2, 4);
+            SeedTournamentParticipant(6, 2, null, 3, 6);
+            SeedTournamentParticipant(7, 2, null, 4, 8);
+            SeedTournamentParticipant(8, 2, null, 5, 9);
+            SeedTournamentParticipant(9, 2, null, 6, 10);
+            SeedTournamentParticipant(11, 3, null, 1, 1);
+            SeedTournamentParticipant(12, 3, null, 2, 2);
+            SeedTournamentParticipant(13, 3, null, 3, 4);
+            SeedTournamentParticipant(14, 4, null, 1, 5);
+            SeedTournamentParticipant(15, 4, null, 2, 3);
 
             SeedRow("Streams", new Dictionary<string, object>
             {
@@ -1041,6 +1081,12 @@ namespace Tournaments.WPF.Services
                 .Where(row => stageIds.Contains(Convert.ToInt32(row["StageID"])))
                 .ToList();
 
+            HashSet<int> generatedMatchIds = new HashSet<int>(generatedMatches.Select(row => Convert.ToInt32(row["MatchID"])));
+            RemoveRows(GetRequiredTable("Streams"), row =>
+                row.Table.Columns.Contains("MatchID") &&
+                row["MatchID"] != DBNull.Value &&
+                generatedMatchIds.Contains(Convert.ToInt32(row["MatchID"])));
+
             foreach (DataRow match in generatedMatches)
             {
                 matches.Rows.Remove(match);
@@ -1050,6 +1096,18 @@ namespace Tournaments.WPF.Services
             {
                 stages.Rows.Remove(stage);
             }
+        }
+
+        private int GetNextMatchNumber(int tournamentId)
+        {
+            DataTable matches = GetRequiredTable("Matches");
+            List<int> existingNumbers = matches.Rows
+                .Cast<DataRow>()
+                .Where(row => AreEqual(row["TournamentID"], tournamentId) && row["MatchNumber"] != DBNull.Value)
+                .Select(row => Convert.ToInt32(row["MatchNumber"]))
+                .ToList();
+
+            return existingNumbers.Count == 0 ? 1 : existingNumbers.Max() + 1;
         }
 
         private int NextIdentity(string tableName)

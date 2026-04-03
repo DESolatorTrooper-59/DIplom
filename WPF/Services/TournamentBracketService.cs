@@ -10,6 +10,9 @@ namespace Tournaments.WPF.Services
     public sealed class TournamentBracketService
     {
         private readonly DatabaseService _database;
+        private const string Player1IdColumn = "Player1ID";
+        private const string Player2IdColumn = "Player2ID";
+        private const string WinnerPlayerIdColumn = "WinnerPlayerID";
 
         public TournamentBracketService(DatabaseService database)
         {
@@ -239,9 +242,9 @@ namespace Tournaments.WPF.Services
                 for (int matchIndex = 0; matchIndex < roundMatches.Count; matchIndex++)
                 {
                     DataRow row = roundMatches[matchIndex];
-                    int? team1Id = ToNullableInt(row["Team1ID"]);
-                    int? team2Id = ToNullableInt(row["Team2ID"]);
-                    int? winnerTeamId = ResolveWinnerTeamId(row, team1Id, team2Id);
+                    int? team1Id = GetPersistedParticipantId(row, isPlayerMode, 1);
+                    int? team2Id = GetPersistedParticipantId(row, isPlayerMode, 2);
+                    int? winnerTeamId = ResolveWinnerParticipantId(row, isPlayerMode, team1Id, team2Id);
                     string team1Name = ResolveStoredParticipantName(team1Id, roundIndex, matchIndex * 2, previousRound, participantsById, isPlayerMode, true);
                     string team2Name = ResolveStoredParticipantName(team2Id, roundIndex, matchIndex * 2 + 1, previousRound, participantsById, isPlayerMode, false);
                     string winnerName = winnerTeamId.HasValue ? ResolveParticipantName(participantsById, winnerTeamId.Value, isPlayerMode) : string.Empty;
@@ -465,9 +468,9 @@ namespace Tournaments.WPF.Services
             return isPlayerMode ? Convert.ToString(participant["Nickname"]) : Convert.ToString(participant["TeamName"]);
         }
 
-        private static int? ResolveWinnerTeamId(DataRow matchRow, int? team1Id, int? team2Id)
+        private static int? ResolveWinnerParticipantId(DataRow matchRow, bool isPlayerMode, int? team1Id, int? team2Id)
         {
-            int? winnerTeamId = ToNullableInt(matchRow["WinnerTeamID"]);
+            int? winnerTeamId = GetPersistedParticipantId(matchRow, isPlayerMode, 3);
             if (winnerTeamId.HasValue && (winnerTeamId == team1Id || winnerTeamId == team2Id))
             {
                 return winnerTeamId;
@@ -492,6 +495,38 @@ namespace Tournaments.WPF.Services
             }
 
             return null;
+        }
+
+        private static int? GetPersistedParticipantId(DataRow matchRow, bool isPlayerMode, int slotIndex)
+        {
+            string preferredColumn = GetParticipantColumnName(isPlayerMode, slotIndex);
+            if (matchRow.Table.Columns.Contains(preferredColumn) && matchRow[preferredColumn] != DBNull.Value)
+            {
+                return Convert.ToInt32(matchRow[preferredColumn]);
+            }
+
+            string fallbackColumn = GetParticipantColumnName(!isPlayerMode, slotIndex);
+            if (matchRow.Table.Columns.Contains(fallbackColumn) && matchRow[fallbackColumn] != DBNull.Value)
+            {
+                return Convert.ToInt32(matchRow[fallbackColumn]);
+            }
+
+            return null;
+        }
+
+        private static string GetParticipantColumnName(bool isPlayerMode, int slotIndex)
+        {
+            switch (slotIndex)
+            {
+                case 1:
+                    return isPlayerMode ? Player1IdColumn : "Team1ID";
+                case 2:
+                    return isPlayerMode ? Player2IdColumn : "Team2ID";
+                case 3:
+                    return isPlayerMode ? WinnerPlayerIdColumn : "WinnerTeamID";
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(slotIndex));
+            }
         }
 
         private static string BuildMetaText(int bestOf, DateTime? matchDate)

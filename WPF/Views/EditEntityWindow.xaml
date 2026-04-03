@@ -5,7 +5,7 @@
         Height="680"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanMinimize">
-  <Grid>
+  <Grid Background="{DynamicResource SurfaceBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -13,10 +13,10 @@
     </Grid.RowDefinitions>
 
     <StackPanel Margin="24,24,24,10">
-      <TextBlock x:Name="TitleText" FontSize="24" FontWeight="Bold" Foreground="#FF102A43" />
+      <TextBlock x:Name="TitleText" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}" />
       <TextBlock Margin="0,6,0,0"
                  Text="Заполните поля и сохраните изменения."
-                 Foreground="#FF486581" />
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="1" Margin="24,0,24,10" VerticalScrollBarVisibility="Auto">

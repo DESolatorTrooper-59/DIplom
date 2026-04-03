@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using Tournaments.WPF.Services;
 using Tournaments.WPF.Views;
 
 namespace Tournaments.WPF
@@ -17,6 +18,17 @@ namespace Tournaments.WPF
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
             TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+        }
+
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            base.OnStartup(e);
+
+            ThemeManager.Initialize();
+
+            LoginWindow loginWindow = new LoginWindow();
+            MainWindow = loginWindow;
+            loginWindow.Show();
         }
 
         private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

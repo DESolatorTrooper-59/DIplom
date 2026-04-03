@@ -21,29 +21,29 @@
       <TextBlock Text="Произошла необработанная ошибка"
                  FontSize="28"
                  FontWeight="Bold"
-                 Foreground="#FF9B1C1C" />
+                 Foreground="{DynamicResource DangerTitleBrush}" />
       <TextBlock x:Name="SummaryText"
                  Margin="0,8,0,0"
                  FontSize="15"
-                 Foreground="#FF486581"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
                  TextWrapping="Wrap" />
     </StackPanel>
 
     <Border Grid.Row="1"
             Margin="0,0,0,14"
             Padding="12"
-            Background="#FFFFF7ED"
-            BorderBrush="#FFF59E0B"
+            Background="{DynamicResource WarningBackgroundBrush}"
+            BorderBrush="{DynamicResource WarningBorderBrush}"
             BorderThickness="1"
             CornerRadius="12">
       <TextBlock Text="Ниже показан стек-трейс. Текст можно выделить и скопировать для диагностики."
-                 Foreground="#FF7C2D12"
+                 Foreground="{DynamicResource WarningForegroundBrush}"
                  TextWrapping="Wrap" />
     </Border>
 
     <Border Grid.Row="2"
-            Background="White"
-            BorderBrush="#FFD9E2EC"
+            Background="{DynamicResource CardBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
             CornerRadius="12">
       <TextBox x:Name="DetailsTextBox"

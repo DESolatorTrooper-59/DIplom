@@ -196,6 +196,9 @@ CREATE TABLE [dbo].[Matches]
     [Team1ID] INT NULL,
     [Team2ID] INT NULL,
     [WinnerTeamID] INT NULL,
+    [Player1ID] INT NULL,
+    [Player2ID] INT NULL,
+    [WinnerPlayerID] INT NULL,
     [Team1Score] INT NOT NULL
         CONSTRAINT [DF_Matches_Team1Score] DEFAULT ((0)),
     [Team2Score] INT NOT NULL
@@ -216,10 +219,23 @@ CREATE TABLE [dbo].[Matches]
         REFERENCES [dbo].[Teams] ([TeamID]),
     CONSTRAINT [FK_Matches_WinnerTeam] FOREIGN KEY ([WinnerTeamID])
         REFERENCES [dbo].[Teams] ([TeamID]),
+    CONSTRAINT [FK_Matches_Player1] FOREIGN KEY ([Player1ID])
+        REFERENCES [dbo].[Players] ([PlayerID]),
+    CONSTRAINT [FK_Matches_Player2] FOREIGN KEY ([Player2ID])
+        REFERENCES [dbo].[Players] ([PlayerID]),
+    CONSTRAINT [FK_Matches_WinnerPlayer] FOREIGN KEY ([WinnerPlayerID])
+        REFERENCES [dbo].[Players] ([PlayerID]),
     CONSTRAINT [UQ_Matches_Tournament_MatchNumber] UNIQUE ([TournamentID], [MatchNumber]),
     CONSTRAINT [CHK_Matches_Status] CHECK ([Status] IN (N'Scheduled', N'Live', N'Completed', N'Cancelled')),
     CONSTRAINT [CHK_Matches_Teams] CHECK ([Team1ID] IS NULL OR [Team2ID] IS NULL OR [Team1ID] <> [Team2ID]),
+    CONSTRAINT [CHK_Matches_Players] CHECK ([Player1ID] IS NULL OR [Player2ID] IS NULL OR [Player1ID] <> [Player2ID]),
     CONSTRAINT [CHK_Matches_Winner] CHECK ([WinnerTeamID] IS NULL OR [WinnerTeamID] = [Team1ID] OR [WinnerTeamID] = [Team2ID]),
+    CONSTRAINT [CHK_Matches_WinnerPlayer] CHECK ([WinnerPlayerID] IS NULL OR [WinnerPlayerID] = [Player1ID] OR [WinnerPlayerID] = [Player2ID]),
+    CONSTRAINT [CHK_Matches_ParticipantSource] CHECK
+    (
+        ([Player1ID] IS NULL AND [Player2ID] IS NULL AND [WinnerPlayerID] IS NULL) OR
+        ([Team1ID] IS NULL AND [Team2ID] IS NULL AND [WinnerTeamID] IS NULL)
+    ),
     CONSTRAINT [CHK_Matches_Score1] CHECK ([Team1Score] >= 0),
     CONSTRAINT [CHK_Matches_Score2] CHECK ([Team2Score] >= 0),
     CONSTRAINT [CHK_Matches_BestOf] CHECK ([BestOf] > 0 AND [BestOf] % 2 = 1)
@@ -261,7 +277,12 @@ INSERT INTO [dbo].[Organizer] ([Login], [Password])
 VALUES (N'admin', N'password');
 
 INSERT INTO [dbo].[GameTitles] ([GameName], [Developer], [ReleaseYear], [MaxPlayersPerTeam])
-VALUES (N'Counter-Strike 2', N'Valve', 2023, 5);
+VALUES
+    (N'Counter-Strike 2', N'Valve', 2023, 5),
+    (N'Tiberium Wars', N'EA LA', 2007, 4),
+    (N'Kane''s Wrath', N'EA LA', 2008, 4),
+    (N'Red Alert 2', N'Westwood Studios, EA Pacific', 2000, 4),
+    (N'Red Alert 3', N'EA LA', 2008, 4);
 
 INSERT INTO [dbo].[Teams] ([TeamName], [FoundedDate], [Country], [CoachName])
 VALUES
@@ -271,7 +292,15 @@ VALUES
 INSERT INTO [dbo].[Players] ([Nickname], [RealName], [Country], [BirthDate])
 VALUES
     (N's1mple', N'Oleksandr Kostyliev', N'Ukraine', '1997-10-02'),
-    (N'donk', N'Danil Kryshkovets', N'Russia', '2007-01-25');
+    (N'donk', N'Danil Kryshkovets', N'Russia', '2007-01-25'),
+    (N'DESolatorTrooper', N'Sergey Kornev', N'Russia', '2005-06-21'),
+    (N'Bookuha', N'Andrey', N'Ukraine', '2000-01-01'),
+    (N'Bikerushownz', N'Скрыто', N'United Kingdom', '2000-01-01'),
+    (N'Hulk', N'Ivan', N'Russia', '2000-01-01'),
+    (N'Mah_Boi', N'Скрыто', N'Blocked', '2000-01-01'),
+    (N'Lamas', N'Скрыто', N'USA', '2026-04-01'),
+    (N'Rildcom', N'Скрыто', N'Australia', '2000-01-01'),
+    (N'Svenson', N'Скрыто', N'Nigerlands', '2000-01-01');
 
 INSERT INTO [dbo].[Sponsors] ([SponsorName], [Industry])
 VALUES (N'Red Bull', N'Energy Drinks');
@@ -301,6 +330,42 @@ VALUES
     N'Single Elimination',
     2,
     N'Команды'
+),
+(
+    N'WEC Season 1',
+    3,
+    '2026-02-01',
+    NULL,
+    1000.00,
+    N'Bikerushownz',
+    N'Online',
+    N'League',
+    8,
+    N'Игроки'
+),
+(
+    N'WEC Season 2',
+    3,
+    '2026-03-01',
+    NULL,
+    1000.00,
+    N'Bikerushownz',
+    N'Online',
+    N'League',
+    24,
+    N'Игроки'
+),
+(
+    N'Red Champions',
+    5,
+    '2024-07-05',
+    '2024-08-16',
+    1.00,
+    N'MoscowCypersports',
+    N'Online',
+    N'Single Elimination',
+    24,
+    N'Игроки'
 );
 
 INSERT INTO [dbo].[TournamentStages] ([TournamentID], [StageName], [StageOrder], [BracketType])
@@ -311,10 +376,25 @@ VALUES
     (1, 1, '2026-01-15', 1, N'AWPer'),
     (2, 2, '2026-01-20', 1, N'Star Player');
 
-INSERT INTO [dbo].[TournamentParticipants] ([TournamentID], [TeamID], [PlayerID], [Seed], [FinalPlace])
+SET IDENTITY_INSERT [dbo].[TournamentParticipants] ON;
+
+INSERT INTO [dbo].[TournamentParticipants] ([ParticipationID], [TournamentID], [TeamID], [PlayerID], [Seed], [FinalPlace])
 VALUES
-    (1, 1, NULL, 1, NULL),
-    (1, 2, NULL, 2, NULL);
+    (1, 1, 1, NULL, 1, NULL),
+    (2, 1, 2, NULL, 2, NULL),
+    (3, 2, NULL, 3, 1, NULL),
+    (4, 2, NULL, 4, 2, NULL),
+    (6, 2, NULL, 6, 3, NULL),
+    (7, 2, NULL, 8, 4, NULL),
+    (8, 2, NULL, 9, 5, NULL),
+    (9, 2, NULL, 10, 6, NULL),
+    (11, 3, NULL, 1, 1, NULL),
+    (12, 3, NULL, 2, 2, NULL),
+    (13, 3, NULL, 4, 3, NULL),
+    (14, 4, NULL, 5, 1, NULL),
+    (15, 4, NULL, 3, 2, NULL);
+
+SET IDENTITY_INSERT [dbo].[TournamentParticipants] OFF;
 
 INSERT INTO [dbo].[Matches]
 (

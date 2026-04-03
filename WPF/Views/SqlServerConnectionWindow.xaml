@@ -19,10 +19,10 @@
       <TextBlock Text="Подключение к MS SQL Server"
                  FontSize="24"
                  FontWeight="Bold"
-                 Foreground="#FF102A43" />
+                 Foreground="{DynamicResource TextPrimaryBrush}" />
       <TextBlock Margin="0,8,0,0"
                  Text="Укажите параметры сервера и проверьте соединение с базой данных."
-                 Foreground="#FF486581"
+                 Foreground="{DynamicResource TextSecondaryBrush}"
                  TextWrapping="Wrap" />
     </StackPanel>
 
@@ -49,13 +49,13 @@
         <Border x:Name="MessageContainer"
                 Margin="0,12,0,0"
                 Padding="12"
-                Background="#FFFEE4E2"
-                BorderBrush="#FFFECACA"
+                Background="{DynamicResource MessageErrorBackgroundBrush}"
+                BorderBrush="{DynamicResource MessageErrorBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="10"
                 Visibility="Collapsed">
           <TextBlock x:Name="MessageText"
-                     Foreground="#FFB42318"
+                     Foreground="{DynamicResource MessageErrorForegroundBrush}"
                      TextWrapping="Wrap" />
         </Border>
       </StackPanel>
