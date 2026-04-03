@@ -20,9 +20,12 @@ namespace Tournaments.WPF.Views
         private const double ChampionHeight = 46;
         private const double CanvasPadding = 18;
         private const double ColumnTop = 42;
-        private const double HeaderHeight = 28;
-        private const double BinarySectionTopPadding = 48;
-        private const double LinearSectionTopPadding = 48;
+        private const double MatchesTop = 63;
+        private const double HeaderHeight = 16;
+        private const double HeaderTopPadding = 8;
+        private const double HeaderBottomGap = 12;
+        private const double BinarySectionTopPadding = 21;
+        private const double LinearSectionTopPadding = 36;
         private const double FirstRoundStep = 118;
         private const double LinearStep = 104;
         private const double SectionGap = 92;
@@ -44,6 +47,19 @@ namespace Tournaments.WPF.Views
 
             bool isDouble = upperRounds.Count > 0 || lowerRounds.Count > 0 || finalRounds.Count > 0;
             bool isLeague = leagueRounds.Count > 0;
+
+            if (isLeague)
+            {
+                RenderLegacyLeague(canvas, snapshot.TournamentName, leagueRounds, selectedMatchId, matchClick);
+                return;
+            }
+
+            if (!isDouble)
+            {
+                RenderLegacyMainBracket(canvas, snapshot.TournamentName, snapshot.ChampionName, mainRounds, selectedMatchId, matchClick);
+                return;
+            }
+
             List<BracketRoundViewModel> primaryRounds = isLeague ? leagueRounds : (upperRounds.Count > 0 ? upperRounds : mainRounds);
             int firstRoundMatches = primaryRounds.Count == 0 ? 0 : primaryRounds[0].Matches.Count;
             double upperHeight = isLeague
@@ -71,7 +87,8 @@ namespace Tournaments.WPF.Views
                 double sectionTop = ResolveSectionTop(round.SectionKey, upperTop, lowerTop, finalTop);
                 double sectionHeight = ResolveSectionHeight(round.SectionKey, upperHeight, lowerHeight, isLeague ? upperHeight : FinalSectionHeight);
                 double columnX = GetColumnX(round.LayoutColumn);
-                AddElement(canvas, CreateColumnFrame(round.Title, sectionHeight), columnX, sectionTop);
+                AddElement(canvas, CreateColumnFrame(sectionHeight), columnX, sectionTop);
+                AddElement(canvas, CreateStageHeader(round.Title), GetCardX(round.LayoutColumn), GetHeaderTop(sectionTop));
             }
 
             Dictionary<string, CardBounds> cardBounds = new Dictionary<string, CardBounds>(System.StringComparer.OrdinalIgnoreCase);
@@ -103,7 +120,9 @@ namespace Tournaments.WPF.Views
             int championColumn = maxLayoutColumn + 1;
             if (!isLeague)
             {
-                AddElement(canvas, CreateColumnFrame("Чемпион", isDouble ? FinalSectionHeight : upperHeight), GetColumnX(championColumn), isDouble ? finalTop : upperTop);
+                double championSectionTop = isDouble ? finalTop : upperTop;
+                AddElement(canvas, CreateColumnFrame(isDouble ? FinalSectionHeight : upperHeight), GetColumnX(championColumn), championSectionTop);
+                AddElement(canvas, CreateStageHeader("Чемпион"), GetCardX(championColumn), GetHeaderTop(championSectionTop));
             }
 
             foreach (BracketRoundViewModel round in snapshot.Rounds)
@@ -151,6 +170,84 @@ namespace Tournaments.WPF.Views
             }
         }
 
+        private static void RenderLegacyMainBracket(Canvas canvas, string tournamentName, string championName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
+        {
+            int roundCount = rounds.Count;
+            int firstRoundMatches = roundCount == 0 ? 0 : rounds[0].Matches.Count;
+            double totalWidth = CanvasPadding * 2 + (roundCount + 1) * ColumnWidth + roundCount * ColumnGap;
+            double totalHeight = System.Math.Max(460, MatchesTop + firstRoundMatches * FirstRoundStep + 32);
+
+            canvas.Width = totalWidth;
+            canvas.Height = totalHeight;
+
+            AddElement(canvas, CreateCaption(tournamentName), CanvasPadding, 0);
+
+            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
+            {
+                AddElement(canvas, CreateColumnFrame(totalHeight - ColumnTop), GetColumnX(roundIndex), ColumnTop);
+                AddElement(canvas, CreateStageHeader(rounds[roundIndex].Title), GetCardX(roundIndex), GetHeaderTop(ColumnTop));
+            }
+
+            AddElement(canvas, CreateColumnFrame(totalHeight - ColumnTop), GetColumnX(roundCount), ColumnTop);
+            AddElement(canvas, CreateStageHeader("Чемпион"), GetCardX(roundCount), GetHeaderTop(ColumnTop));
+
+            for (int roundIndex = 1; roundIndex < roundCount; roundIndex++)
+            {
+                DrawLegacyRoundConnectors(canvas, rounds, roundIndex);
+            }
+
+            DrawLegacyChampionConnector(canvas, roundCount);
+
+            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
+            {
+                double cardLeft = GetCardX(roundIndex);
+                for (int matchIndex = 0; matchIndex < rounds[roundIndex].Matches.Count; matchIndex++)
+                {
+                    BracketMatchViewModel match = rounds[roundIndex].Matches[matchIndex];
+                    Border card = CreateMatchCard(match, selectedMatchId);
+                    PrepareInteractiveCard(card, match, matchClick);
+                    AddElement(canvas, card, cardLeft, GetLegacyCardTop(roundIndex, matchIndex));
+                }
+            }
+
+            if (roundCount > 0)
+            {
+                Border championCard = CreateChampionCard(championName);
+                AddElement(canvas, championCard, GetCardX(roundCount), GetLegacyMatchCenterY(roundCount - 1, 0) - ChampionHeight / 2);
+            }
+        }
+
+        private static void RenderLegacyLeague(Canvas canvas, string tournamentName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
+        {
+            int roundCount = rounds.Count;
+            int maxMatches = roundCount == 0 ? 0 : rounds.Max(round => round.Matches.Count);
+            double totalWidth = CanvasPadding * 2 + roundCount * ColumnWidth + System.Math.Max(0, roundCount - 1) * ColumnGap;
+            double totalHeight = System.Math.Max(460, MatchesTop + maxMatches * FirstRoundStep + 32);
+
+            canvas.Width = totalWidth;
+            canvas.Height = totalHeight;
+
+            AddElement(canvas, CreateCaption(tournamentName), CanvasPadding, 0);
+
+            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
+            {
+                AddElement(canvas, CreateColumnFrame(totalHeight - ColumnTop), GetColumnX(roundIndex), ColumnTop);
+                AddElement(canvas, CreateStageHeader(rounds[roundIndex].Title), GetCardX(roundIndex), GetHeaderTop(ColumnTop));
+            }
+
+            for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
+            {
+                double cardLeft = GetCardX(roundIndex);
+                for (int matchIndex = 0; matchIndex < rounds[roundIndex].Matches.Count; matchIndex++)
+                {
+                    BracketMatchViewModel match = rounds[roundIndex].Matches[matchIndex];
+                    Border card = CreateMatchCard(match, selectedMatchId);
+                    PrepareInteractiveCard(card, match, matchClick);
+                    AddElement(canvas, card, cardLeft, GetLegacyLeagueCardTop(matchIndex));
+                }
+            }
+        }
+
         private static double ResolveSectionTop(string sectionKey, double upperTop, double lowerTop, double finalTop)
         {
             if (string.Equals(sectionKey, "Lower", System.StringComparison.OrdinalIgnoreCase))
@@ -190,7 +287,7 @@ namespace Tournaments.WPF.Views
 
             if (string.Equals(round.SectionKey, "Final", System.StringComparison.OrdinalIgnoreCase))
             {
-                return finalTop + HeaderHeight + 30;
+                return finalTop + HeaderTopPadding + HeaderHeight + HeaderBottomGap;
             }
 
             return ResolveSectionTop(round.SectionKey, upperTop, lowerTop, finalTop) + GetBinaryCardTop(round.SectionIndex, matchIndex);
@@ -217,15 +314,43 @@ namespace Tournaments.WPF.Views
             return HeaderHeight + LinearSectionTopPadding + maxMatches * LinearStep + 12;
         }
 
-        private static Border CreateColumnFrame(string title, double height)
+        private static void DrawLegacyRoundConnectors(Canvas canvas, IList<BracketRoundViewModel> rounds, int roundIndex)
         {
-            Grid grid = new Grid
-            {
-                Width = ColumnWidth,
-                Height = height
-            };
+            double previousRight = GetCardX(roundIndex - 1) + MatchWidth;
+            double currentLeft = GetCardX(roundIndex);
+            double middleX = previousRight + (currentLeft - previousRight) / 2;
+            int matchesInRound = rounds[roundIndex].Matches.Count;
 
-            Border panel = new Border
+            for (int matchIndex = 0; matchIndex < matchesInRound; matchIndex++)
+            {
+                double upperY = GetLegacyMatchCenterY(roundIndex - 1, matchIndex * 2);
+                double lowerY = GetLegacyMatchCenterY(roundIndex - 1, matchIndex * 2 + 1);
+                double currentY = GetLegacyMatchCenterY(roundIndex, matchIndex);
+                DrawLine(canvas, previousRight, upperY, middleX, upperY);
+                DrawLine(canvas, previousRight, lowerY, middleX, lowerY);
+                DrawLine(canvas, middleX, upperY, middleX, lowerY);
+                DrawLine(canvas, middleX, currentY, currentLeft, currentY);
+            }
+        }
+
+        private static void DrawLegacyChampionConnector(Canvas canvas, int roundCount)
+        {
+            if (roundCount <= 0)
+            {
+                return;
+            }
+
+            double finalRight = GetCardX(roundCount - 1) + MatchWidth;
+            double championLeft = GetCardX(roundCount);
+            double finalY = GetLegacyMatchCenterY(roundCount - 1, 0);
+            double middleX = finalRight + (championLeft - finalRight) / 2;
+            DrawLine(canvas, finalRight, finalY, middleX, finalY);
+            DrawLine(canvas, middleX, finalY, championLeft, finalY);
+        }
+
+        private static Border CreateColumnFrame(double height)
+        {
+            return new Border
             {
                 Width = ColumnWidth,
                 Height = height,
@@ -234,11 +359,13 @@ namespace Tournaments.WPF.Views
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(4)
             };
-            grid.Children.Add(panel);
+        }
 
-            grid.Children.Add(new Border
+        private static Border CreateStageHeader(string title)
+        {
+            return new Border
             {
-                Width = ColumnWidth,
+                Width = MatchWidth,
                 Height = HeaderHeight,
                 Background = ThemeGradient("BracketHeaderStartBrush", "BracketHeaderEndBrush", Color.FromRgb(252, 252, 252), Color.FromRgb(183, 183, 183)),
                 BorderBrush = ThemeBrush("BracketHeaderBorderBrush", new SolidColorBrush(Color.FromRgb(118, 118, 118))),
@@ -248,16 +375,16 @@ namespace Tournaments.WPF.Views
                 {
                     Text = title,
                     HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Top,
-                    Margin = new Thickness(8, 3, 8, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 4, 0),
+                    FontSize = 10,
                     FontWeight = FontWeights.SemiBold,
                     TextAlignment = TextAlignment.Center,
+                    TextWrapping = TextWrapping.NoWrap,
                     TextTrimming = TextTrimming.CharacterEllipsis,
                     Foreground = ThemeBrush("BracketHeaderTextBrush", new SolidColorBrush(Color.FromRgb(17, 24, 39)))
                 }
-            });
-
-            return new Border { Child = grid };
+            };
         }
 
         private static Border CreateCaption(string tournamentName)
@@ -401,6 +528,19 @@ namespace Tournaments.WPF.Views
             DrawLine(canvas, middleX, targetY, targetX, targetY);
         }
 
+        private static void PrepareInteractiveCard(Border card, BracketMatchViewModel match, MouseButtonEventHandler matchClick)
+        {
+            if (!match.IsEditable || matchClick == null)
+            {
+                return;
+            }
+
+            card.Tag = match;
+            card.Cursor = Cursors.Hand;
+            card.ToolTip = "Нажмите, чтобы отредактировать матч";
+            card.MouseLeftButtonUp += matchClick;
+        }
+
         private static void DrawLine(Canvas canvas, double x1, double y1, double x2, double y2)
         {
             canvas.Children.Add(new Line
@@ -440,6 +580,26 @@ namespace Tournaments.WPF.Views
             }
 
             return score.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static double GetLegacyMatchCenterY(int roundIndex, int matchIndex)
+        {
+            return MatchesTop + (matchIndex + 0.5) * FirstRoundStep * System.Math.Pow(2, roundIndex);
+        }
+
+        private static double GetLegacyCardTop(int roundIndex, int matchIndex)
+        {
+            return GetLegacyMatchCenterY(roundIndex, matchIndex) - MatchHeight / 2;
+        }
+
+        private static double GetLegacyLeagueCardTop(int matchIndex)
+        {
+            return GetLegacyMatchCenterY(0, matchIndex) - MatchHeight / 2;
+        }
+
+        private static double GetHeaderTop(double sectionTop)
+        {
+            return sectionTop + HeaderTopPadding;
         }
 
         private static double GetColumnX(int roundIndex)
