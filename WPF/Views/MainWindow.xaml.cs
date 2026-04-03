@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -36,6 +37,40 @@ namespace Tournaments.WPF.Views
         private void EntitiesList_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             NavigationItem item = EntitiesList.SelectedItem as NavigationItem;
+            NavigateTo(item);
+        }
+
+        public bool OpenEntityPage(string tableName)
+        {
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                return false;
+            }
+
+            NavigationItem target = EntitiesList.Items
+                .OfType<NavigationItem>()
+                .FirstOrDefault(item => item.EntityDefinition != null &&
+                    string.Equals(item.EntityDefinition.TableName, tableName, StringComparison.OrdinalIgnoreCase));
+
+            if (target == null)
+            {
+                return false;
+            }
+
+            if (!ReferenceEquals(EntitiesList.SelectedItem, target))
+            {
+                EntitiesList.SelectedItem = target;
+            }
+            else
+            {
+                NavigateTo(target);
+            }
+
+            return true;
+        }
+
+        private void NavigateTo(NavigationItem item)
+        {
             if (item == null)
             {
                 return;

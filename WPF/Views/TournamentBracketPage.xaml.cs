@@ -128,6 +128,17 @@ namespace Tournaments.WPF.Views
             LoadTournaments(GetSelectedTournamentId());
         }
 
+        private void OpenParticipants_Click(object sender, RoutedEventArgs e)
+        {
+            MainWindow mainWindow = Window.GetWindow(this) as MainWindow;
+            if (mainWindow != null && mainWindow.OpenEntityPage("TournamentParticipants"))
+            {
+                return;
+            }
+
+            MessageBox.Show("Не удалось открыть страницу \"Участники турниров\".", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
         private void SaveMatch_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedMatch == null)
