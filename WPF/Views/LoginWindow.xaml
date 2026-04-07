@@ -214,7 +214,7 @@
                      Foreground="{DynamicResource TextPrimaryBrush}" />
           <TextBlock x:Name="SubtitleText"
                      Margin="0,8,0,0"
-                     Text="Войдите под учётной записью организатора, чтобы открыть управление турнирами."
+                     Text="Войдите под своей учётной записью, чтобы открыть приложение."
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
@@ -231,7 +231,7 @@
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
-                       Text="Логин"
+                       Text="Логин / Никнейм"
                        FontWeight="SemiBold"
                        Margin="0,0,0,6"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -311,14 +311,13 @@
                       Style="{StaticResource GhostButtonStyle}"
                       Click="SqlModeButton_Click" />
               <Button Grid.Column="4"
-                      x:Name="CloseButton"
-                      Width="110"
+                      x:Name="RegisterModeButton"
+                      Width="120"
                       Margin="0"
                       HorizontalAlignment="Left"
-                      Content="Закрыть"
+                      Content="Регистрация"
                       Style="{StaticResource GhostButtonStyle}"
-                      Click="Close_Click"
-                      IsCancel="True" />
+                      Click="Register_Click" />
             </Grid>
           </Grid>
 
@@ -405,8 +404,6 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="12" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="12" />
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
 
@@ -424,13 +421,149 @@
                       Content="Назад"
                       Style="{StaticResource GhostButtonStyle}"
                       Click="BackToLogin_Click" />
-              <Button Grid.Column="4"
+            </Grid>
+          </Grid>
+
+          <Grid x:Name="RegistrationModeGrid" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Text="Логин (Никнейм)"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,6"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <TextBox Grid.Row="1"
+                     x:Name="RegisterNicknameTextBox"
+                     Height="38"
+                     KeyDown="RegisterInput_KeyDown" />
+
+            <Grid Grid.Row="2" Margin="0,10,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel Grid.Column="0">
+                <TextBlock Text="Дата рождения"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,6"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <DatePicker x:Name="RegisterBirthDatePicker"
+                            Height="38"
+                            KeyDown="RegisterInput_KeyDown"
+                            SelectedDateFormat="Short" />
+              </StackPanel>
+
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="Имя (необязательно)"
+                           FontWeight="SemiBold"
+                           Margin="0,0,0,6"
+                           Foreground="{DynamicResource TextPrimaryBrush}" />
+                <TextBox x:Name="RegisterRealNameTextBox"
+                         Height="38"
+                         KeyDown="RegisterInput_KeyDown" />
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="3"
+                       Text="Пароль"
+                       FontWeight="SemiBold"
+                       Margin="0,12,0,6"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Grid Grid.Row="4">
+              <PasswordBox x:Name="RegisterPasswordTextBox"
+                           Height="38"
+                           KeyDown="RegisterInput_KeyDown"
+                           PasswordChanged="RegisterPasswordTextBox_PasswordChanged" />
+              <TextBox x:Name="RegisterPasswordVisibleTextBox"
+                       Height="38"
+                       KeyDown="RegisterInput_KeyDown"
+                       TextChanged="RegisterPasswordVisibleTextBox_TextChanged"
+                       Visibility="Collapsed" />
+            </Grid>
+
+            <TextBlock Grid.Row="5"
+                       Text="Подтвердите пароль"
+                       FontWeight="SemiBold"
+                       Margin="0,12,0,6"
+                       Foreground="{DynamicResource TextPrimaryBrush}" />
+            <Grid Grid.Row="6">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <Grid Grid.Column="0">
+                <PasswordBox x:Name="RegisterConfirmPasswordTextBox"
+                             Height="38"
+                             KeyDown="RegisterInput_KeyDown"
+                             PasswordChanged="RegisterConfirmPasswordTextBox_PasswordChanged" />
+                <TextBox x:Name="RegisterConfirmPasswordVisibleTextBox"
+                         Height="38"
+                         KeyDown="RegisterInput_KeyDown"
+                         TextChanged="RegisterConfirmPasswordVisibleTextBox_TextChanged"
+                         Visibility="Collapsed" />
+              </Grid>
+
+              <Button Grid.Column="2"
+                      x:Name="RegisterTogglePasswordVisibilityButton"
+                      Width="96"
+                      Height="38"
+                      Content="Показать"
+                      Style="{StaticResource GhostButtonStyle}"
+                      Click="RegisterTogglePasswordVisibility_Click" />
+            </Grid>
+
+            <Border Grid.Row="7"
+                    x:Name="RegisterMessageContainer"
+                    Margin="0,12,0,16"
+                    Padding="12"
+                    Background="{DynamicResource MessageErrorBackgroundBrush}"
+                    BorderBrush="{DynamicResource MessageErrorBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Visibility="Collapsed">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="100">
+                <TextBlock x:Name="RegisterMessageText"
+                           Foreground="{DynamicResource MessageErrorForegroundBrush}"
+                           TextWrapping="Wrap" />
+              </ScrollViewer>
+            </Border>
+
+            <Grid Grid.Row="8" HorizontalAlignment="Stretch">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+
+              <Button Grid.Column="0"
+                      x:Name="CompleteRegistrationButton"
+                      Width="130"
+                      Margin="0"
+                      HorizontalAlignment="Left"
+                      Content="Регистрация"
+                      Click="CompleteRegistration_Click" />
+              <Button Grid.Column="2"
                       Width="110"
                       Margin="0"
                       HorizontalAlignment="Left"
-                      Content="Закрыть"
+                      Content="Назад"
                       Style="{StaticResource GhostButtonStyle}"
-                      Click="Close_Click" />
+                      Click="BackToLogin_Click" />
             </Grid>
           </Grid>
         </Grid>

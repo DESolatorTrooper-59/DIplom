@@ -41,7 +41,19 @@ namespace Tournaments.WPF.Services
         {
             lock (_syncRoot)
             {
-                return _users.TryGetValue(login, out string storedPassword) && string.Equals(storedPassword, password, StringComparison.Ordinal);
+                if (_users.TryGetValue(login, out string storedPassword) && string.Equals(storedPassword, password, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+
+                DataTable players = GetRequiredTable("Players");
+                return players.Rows
+                    .Cast<DataRow>()
+                    .Any(row =>
+                        !IsNull(row["Nickname"]) &&
+                        !IsNull(row["Password"]) &&
+                        string.Equals(Convert.ToString(row["Nickname"]), login, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(Convert.ToString(row["Password"]), password, StringComparison.Ordinal));
             }
         }
 
@@ -540,7 +552,8 @@ namespace Tournaments.WPF.Services
                 Column("Nickname", typeof(string)),
                 Column("RealName", typeof(string)),
                 Column("Country", typeof(string)),
-                Column("BirthDate", typeof(DateTime)));
+                Column("BirthDate", typeof(DateTime)),
+                Column("Password", typeof(string)));
 
             CreateTable("Sponsors", "SponsorID",
                 Column("SponsorID", typeof(int)),
@@ -961,6 +974,13 @@ namespace Tournaments.WPF.Services
             if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) && IsNull(row["RealName"]))
             {
                 row["RealName"] = "Скрыто";
+            }
+
+            if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) &&
+                row.Table.Columns.Contains("Country") &&
+                IsNull(row["Country"]))
+            {
+                row["Country"] = "Не указано";
             }
 
             if (string.Equals(tableName, "Tournaments", StringComparison.OrdinalIgnoreCase) && row.Table.Columns.Contains("ParticipantMode") && IsNull(row["ParticipantMode"]))

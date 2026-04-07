@@ -26,7 +26,7 @@ namespace Tournaments.WPF.Views
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            UserText.Text = "Организатор: " + _login + "\nРежим: " + _database.ModeTitle + "\nХранилище: " + _database.StorageLabel;
+            UserText.Text = "Учетная запись: " + _login + "\nРежим: " + _database.ModeTitle + "\nХранилище: " + _database.StorageLabel;
             EntitiesList.ItemsSource = BuildNavigationItems();
             EntitiesList.DisplayMemberPath = "Title";
             if (EntitiesList.Items.Count > 0)

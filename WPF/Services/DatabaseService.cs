@@ -8,6 +8,8 @@ namespace Tournaments.WPF.Services
 {
     public sealed class DatabaseService
     {
+        private const string HiddenPlayerName = "Скрыто";
+        private const string UnspecifiedCountry = "Не указано";
         private readonly IDataBackend _backend;
         private readonly Dictionary<string, IReadOnlyCollection<string>> _columnsCache = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -50,6 +52,42 @@ namespace Tournaments.WPF.Services
         public void EnsureOrganizerUser(string login, string password)
         {
             _backend.EnsureOrganizerUser(login, password);
+        }
+
+        public void RegisterPlayer(string nickname, DateTime birthDate, string realName, string password)
+        {
+            string normalizedNickname = (nickname ?? string.Empty).Trim();
+            string normalizedRealName = string.IsNullOrWhiteSpace(realName) ? HiddenPlayerName : realName.Trim();
+            string normalizedPassword = password ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(normalizedNickname))
+            {
+                throw new InvalidOperationException("Никнейм не может быть пустым.");
+            }
+
+            if (string.IsNullOrWhiteSpace(normalizedPassword))
+            {
+                throw new InvalidOperationException("Пароль не может быть пустым.");
+            }
+
+            if (birthDate.Date > DateTime.Today)
+            {
+                throw new InvalidOperationException("Дата рождения не может быть больше текущей даты.");
+            }
+
+            if (RecordExists("Players", "Nickname", normalizedNickname))
+            {
+                throw new InvalidOperationException("Игрок с таким никнеймом уже существует.");
+            }
+
+            Insert("Players", new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Nickname"] = normalizedNickname,
+                ["RealName"] = normalizedRealName,
+                ["Country"] = UnspecifiedCountry,
+                ["BirthDate"] = birthDate.Date,
+                ["Password"] = normalizedPassword
+            });
         }
 
         public bool RecordExists(string tableName, string columnName, object value)
@@ -135,6 +173,7 @@ namespace Tournaments.WPF.Services
             }
 
             ValidateRequiredColumns("Organizer", "Login", "Password");
+            ValidateRequiredColumns("Players", "Password");
             foreach (EntityDefinition definition in EntityRegistry.All)
             {
                 IReadOnlyCollection<string> columns = GetAvailableColumns(definition.TableName);

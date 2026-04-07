@@ -75,6 +75,7 @@ CREATE TABLE [dbo].[Players]
     [RealName] NVARCHAR(150) NOT NULL,
     [Country] NVARCHAR(50) NOT NULL,
     [BirthDate] DATE NOT NULL,
+    [Password] NVARCHAR(50) NULL,
     CONSTRAINT [PK_Players] PRIMARY KEY CLUSTERED ([PlayerID] ASC),
     CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Nickname])
 );

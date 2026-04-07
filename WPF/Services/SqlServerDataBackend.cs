@@ -65,7 +65,20 @@ namespace Tournaments.WPF.Services
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlCommand command = connection.CreateCommand())
             {
-                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Organizer] WHERE [Login] = @Login AND [Password] = @Password";
+                command.CommandText = @"
+SELECT CASE
+    WHEN EXISTS (
+        SELECT 1
+        FROM [dbo].[Organizer]
+        WHERE [Login] = @Login AND [Password] = @Password
+    ) OR EXISTS (
+        SELECT 1
+        FROM [dbo].[Players]
+        WHERE [Nickname] = @Login AND [Password] = @Password
+    )
+    THEN 1
+    ELSE 0
+END";
                 AddParameter(command, "@Login", login);
                 AddParameter(command, "@Password", password);
                 return Convert.ToInt32(command.ExecuteScalar()) > 0;

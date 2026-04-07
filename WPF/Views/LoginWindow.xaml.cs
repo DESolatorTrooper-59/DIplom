@@ -11,6 +11,13 @@ namespace Tournaments.WPF.Views
 {
     public partial class LoginWindow : Window
     {
+        private enum LoginWindowMode
+        {
+            Login,
+            Sql,
+            Register
+        }
+
         private readonly DatabaseService _testDatabase;
         private DatabaseService _database;
         private DatabaseService _sqlDatabase;
@@ -18,17 +25,21 @@ namespace Tournaments.WPF.Views
         private bool _isConnecting;
         private bool _isPasswordVisible;
         private bool _isUpdatingPasswordFields;
+        private bool _isRegisterPasswordVisible;
+        private bool _isUpdatingRegisterPasswordFields;
         private string _loginMessage;
         private bool _isLoginMessageError = true;
         private string _sqlMessage;
         private bool _isSqlMessageError = true;
+        private string _registerMessage;
+        private bool _isRegisterMessageError = true;
 
         public LoginWindow()
         {
             InitializeComponent();
             Loaded += LoginWindow_Loaded;
             _sqlConnectionService = SqlServerConnectionService.Instance;
-            SwitchMode(false);
+            SwitchMode(LoginWindowMode.Login);
             UpdateThemeToggleState();
 
             try
@@ -56,6 +67,8 @@ namespace Tournaments.WPF.Views
         private void LoginWindow_Loaded(object sender, RoutedEventArgs e)
         {
             UpdatePasswordVisibility(false);
+            RegisterBirthDatePicker.DisplayDateEnd = DateTime.Today;
+            UpdateRegisterPasswordVisibility(false);
             LoginTextBox.Focus();
         }
 
@@ -73,7 +86,7 @@ namespace Tournaments.WPF.Views
             string password = GetLoginPassword();
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             {
-                SetLoginMessage("Введите логин и пароль.");
+                SetLoginMessage("Введите логин или никнейм и пароль.");
                 return;
             }
 
@@ -89,6 +102,24 @@ namespace Tournaments.WPF.Views
             Close();
         }
 
+        private void Register_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isConnecting)
+            {
+                return;
+            }
+
+            if (_database == null)
+            {
+                SetLoginMessage("Хранилище приложения не инициализировано.");
+                return;
+            }
+
+            ResetRegistrationForm();
+            SwitchMode(LoginWindowMode.Register);
+            RegisterNicknameTextBox.Focus();
+        }
+
         private void TestModeButton_Click(object sender, RoutedEventArgs e)
         {
             if (_isConnecting)
@@ -97,7 +128,7 @@ namespace Tournaments.WPF.Views
             }
 
             SetSqlMessage(null);
-            SwitchMode(false);
+            SwitchMode(LoginWindowMode.Login);
             ActivateTestMode(true);
             LoginTextBox.Focus();
         }
@@ -111,7 +142,7 @@ namespace Tournaments.WPF.Views
         {
             PopulateSqlSettings();
             SetSqlMessage(null);
-            SwitchMode(true);
+            SwitchMode(LoginWindowMode.Sql);
         }
 
         private void BackToLogin_Click(object sender, RoutedEventArgs e)
@@ -121,7 +152,7 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            SwitchMode(false);
+            SwitchMode(LoginWindowMode.Login);
             LoginTextBox.Focus();
         }
 
@@ -156,7 +187,7 @@ namespace Tournaments.WPF.Views
 
                 ActivateSqlDatabase(sqlDatabase, true);
                 SetSqlMessage(null);
-                SwitchMode(false);
+                SwitchMode(LoginWindowMode.Login);
                 LoginTextBox.Focus();
             }
             catch (Exception ex)
@@ -201,9 +232,15 @@ namespace Tournaments.WPF.Views
             ConnectSql_Click(sender, new RoutedEventArgs());
         }
 
-        private void Close_Click(object sender, RoutedEventArgs e)
+        private void RegisterInput_KeyDown(object sender, KeyEventArgs e)
         {
-            Application.Current.Shutdown();
+            if (e.Key != Key.Enter)
+            {
+                return;
+            }
+
+            e.Handled = true;
+            CompleteRegistration_Click(sender, new RoutedEventArgs());
         }
 
         private void ApplyTheme(AppTheme theme)
@@ -297,6 +334,7 @@ namespace Tournaments.WPF.Views
         {
             ApplyMessageState(LoginMessageContainer, LoginMessageText, _loginMessage, _isLoginMessageError);
             ApplyMessageState(SqlMessageContainer, SqlMessageText, _sqlMessage, _isSqlMessageError);
+            ApplyMessageState(RegisterMessageContainer, RegisterMessageText, _registerMessage, _isRegisterMessageError);
         }
 
         private void UpdatePasswordVisibility(bool isVisible)
@@ -344,14 +382,256 @@ namespace Tournaments.WPF.Views
             }
         }
 
-        private void SwitchMode(bool isSqlMode)
+        private void CompleteRegistration_Click(object sender, RoutedEventArgs e)
         {
-            LoginModeGrid.Visibility = isSqlMode ? Visibility.Collapsed : Visibility.Visible;
-            SqlModeGrid.Visibility = isSqlMode ? Visibility.Visible : Visibility.Collapsed;
-            TitleText.Text = isSqlMode ? "MS SQL Server" : "Tournaments WPF";
-            SubtitleText.Text = isSqlMode
-                ? "Укажите параметры сервера и проверьте соединение с базой данных прямо в этом окне."
-                : "Войдите под учётной записью организатора, чтобы открыть управление турнирами.";
+            SetRegisterMessage(null);
+
+            if (_database == null)
+            {
+                SetRegisterMessage("Хранилище приложения не инициализировано.");
+                return;
+            }
+
+            string nickname = RegisterNicknameTextBox.Text.Trim();
+            DateTime? birthDate = RegisterBirthDatePicker.SelectedDate;
+            string realName = RegisterRealNameTextBox.Text.Trim();
+            string password = GetRegisterPassword();
+            string confirmPassword = GetRegisterConfirmPassword();
+
+            if (string.IsNullOrWhiteSpace(nickname))
+            {
+                SetRegisterMessage("Введите никнейм.");
+                return;
+            }
+
+            if (!birthDate.HasValue)
+            {
+                SetRegisterMessage("Укажите дату рождения.");
+                return;
+            }
+
+            if (birthDate.Value.Date > DateTime.Today)
+            {
+                SetRegisterMessage("Дата рождения не может быть больше текущей даты.");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(confirmPassword))
+            {
+                SetRegisterMessage("Введите пароль и подтверждение пароля.");
+                return;
+            }
+
+            if (!string.Equals(password, confirmPassword, StringComparison.Ordinal))
+            {
+                SetRegisterMessage("Пароли не совпадают.");
+                return;
+            }
+
+            try
+            {
+                _database.RegisterPlayer(nickname, birthDate.Value.Date, realName, password);
+                LoginTextBox.Text = nickname;
+                PasswordTextBox.Password = string.Empty;
+                PasswordVisibleTextBox.Text = string.Empty;
+                ResetRegistrationForm();
+                SwitchMode(LoginWindowMode.Login);
+                SetLoginMessage("Регистрация завершена. Теперь войдите под своим никнеймом.", false);
+                LoginTextBox.Focus();
+                LoginTextBox.SelectAll();
+            }
+            catch (Exception ex)
+            {
+                SetRegisterMessage(ex.Message);
+            }
+        }
+
+        private void RegisterTogglePasswordVisibility_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateRegisterPasswordVisibility(!_isRegisterPasswordVisible);
+        }
+
+        private void RegisterPasswordTextBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingRegisterPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingRegisterPasswordFields = true;
+            try
+            {
+                if (RegisterPasswordVisibleTextBox.Text != RegisterPasswordTextBox.Password)
+                {
+                    RegisterPasswordVisibleTextBox.Text = RegisterPasswordTextBox.Password;
+                }
+            }
+            finally
+            {
+                _isUpdatingRegisterPasswordFields = false;
+            }
+        }
+
+        private void RegisterPasswordVisibleTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingRegisterPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingRegisterPasswordFields = true;
+            try
+            {
+                if (RegisterPasswordTextBox.Password != RegisterPasswordVisibleTextBox.Text)
+                {
+                    RegisterPasswordTextBox.Password = RegisterPasswordVisibleTextBox.Text;
+                }
+            }
+            finally
+            {
+                _isUpdatingRegisterPasswordFields = false;
+            }
+        }
+
+        private void RegisterConfirmPasswordTextBox_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdatingRegisterPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingRegisterPasswordFields = true;
+            try
+            {
+                if (RegisterConfirmPasswordVisibleTextBox.Text != RegisterConfirmPasswordTextBox.Password)
+                {
+                    RegisterConfirmPasswordVisibleTextBox.Text = RegisterConfirmPasswordTextBox.Password;
+                }
+            }
+            finally
+            {
+                _isUpdatingRegisterPasswordFields = false;
+            }
+        }
+
+        private void RegisterConfirmPasswordVisibleTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_isUpdatingRegisterPasswordFields)
+            {
+                return;
+            }
+
+            _isUpdatingRegisterPasswordFields = true;
+            try
+            {
+                if (RegisterConfirmPasswordTextBox.Password != RegisterConfirmPasswordVisibleTextBox.Text)
+                {
+                    RegisterConfirmPasswordTextBox.Password = RegisterConfirmPasswordVisibleTextBox.Text;
+                }
+            }
+            finally
+            {
+                _isUpdatingRegisterPasswordFields = false;
+            }
+        }
+
+        private string GetRegisterPassword()
+        {
+            return _isRegisterPasswordVisible ? RegisterPasswordVisibleTextBox.Text : RegisterPasswordTextBox.Password;
+        }
+
+        private string GetRegisterConfirmPassword()
+        {
+            return _isRegisterPasswordVisible ? RegisterConfirmPasswordVisibleTextBox.Text : RegisterConfirmPasswordTextBox.Password;
+        }
+
+        private void UpdateRegisterPasswordVisibility(bool isVisible)
+        {
+            _isRegisterPasswordVisible = isVisible;
+            if (RegisterPasswordTextBox == null ||
+                RegisterPasswordVisibleTextBox == null ||
+                RegisterConfirmPasswordTextBox == null ||
+                RegisterConfirmPasswordVisibleTextBox == null ||
+                RegisterTogglePasswordVisibilityButton == null)
+            {
+                return;
+            }
+
+            _isUpdatingRegisterPasswordFields = true;
+            try
+            {
+                if (isVisible)
+                {
+                    RegisterPasswordVisibleTextBox.Text = RegisterPasswordTextBox.Password;
+                    RegisterConfirmPasswordVisibleTextBox.Text = RegisterConfirmPasswordTextBox.Password;
+                }
+                else
+                {
+                    RegisterPasswordTextBox.Password = RegisterPasswordVisibleTextBox.Text;
+                    RegisterConfirmPasswordTextBox.Password = RegisterConfirmPasswordVisibleTextBox.Text;
+                }
+            }
+            finally
+            {
+                _isUpdatingRegisterPasswordFields = false;
+            }
+
+            RegisterPasswordTextBox.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+            RegisterPasswordVisibleTextBox.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            RegisterConfirmPasswordTextBox.Visibility = isVisible ? Visibility.Collapsed : Visibility.Visible;
+            RegisterConfirmPasswordVisibleTextBox.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+            RegisterTogglePasswordVisibilityButton.Content = isVisible ? "Скрыть" : "Показать";
+
+            if (!IsLoaded || RegistrationModeGrid.Visibility != Visibility.Visible)
+            {
+                return;
+            }
+
+            if (isVisible)
+            {
+                RegisterConfirmPasswordVisibleTextBox.Focus();
+                RegisterConfirmPasswordVisibleTextBox.CaretIndex = RegisterConfirmPasswordVisibleTextBox.Text.Length;
+            }
+            else
+            {
+                RegisterConfirmPasswordTextBox.Focus();
+            }
+        }
+
+        private void ResetRegistrationForm()
+        {
+            RegisterNicknameTextBox.Text = string.Empty;
+            RegisterBirthDatePicker.SelectedDate = null;
+            RegisterRealNameTextBox.Text = string.Empty;
+            RegisterPasswordTextBox.Password = string.Empty;
+            RegisterPasswordVisibleTextBox.Text = string.Empty;
+            RegisterConfirmPasswordTextBox.Password = string.Empty;
+            RegisterConfirmPasswordVisibleTextBox.Text = string.Empty;
+            UpdateRegisterPasswordVisibility(false);
+            SetRegisterMessage(null);
+        }
+
+        private void SwitchMode(LoginWindowMode mode)
+        {
+            LoginModeGrid.Visibility = mode == LoginWindowMode.Login ? Visibility.Visible : Visibility.Collapsed;
+            SqlModeGrid.Visibility = mode == LoginWindowMode.Sql ? Visibility.Visible : Visibility.Collapsed;
+            RegistrationModeGrid.Visibility = mode == LoginWindowMode.Register ? Visibility.Visible : Visibility.Collapsed;
+
+            switch (mode)
+            {
+                case LoginWindowMode.Sql:
+                    TitleText.Text = "MS SQL Server";
+                    SubtitleText.Text = "Укажите параметры сервера и проверьте соединение с базой данных прямо в этом окне.";
+                    break;
+                case LoginWindowMode.Register:
+                    TitleText.Text = "Регистрация";
+                    SubtitleText.Text = "Зарегистрируйтесь для участия в турнирах и просмотра данных прямо в этом окне.";
+                    break;
+                default:
+                    TitleText.Text = "Tournaments WPF";
+                    SubtitleText.Text = "Войдите под своей учётной записью, чтобы открыть приложение.";
+                    break;
+            }
         }
 
         private void SetConnectingState(bool isConnecting)
@@ -361,6 +641,7 @@ namespace Tournaments.WPF.Views
             ConnectSqlButton.IsEnabled = !isConnecting;
             SqlModeButton.IsEnabled = !isConnecting;
             LoginButton.IsEnabled = !isConnecting;
+            RegisterModeButton.IsEnabled = !isConnecting;
             TestModeButton.IsEnabled = !isConnecting;
             WindowsAuthCheckBox.IsEnabled = !isConnecting;
             SqlServerTextBox.IsEnabled = !isConnecting;
@@ -472,7 +753,7 @@ namespace Tournaments.WPF.Views
 
         private static string BuildTestModeMessage()
         {
-            return "Активен тестовый режим. Для демонстрационной версии можно войти как admin / password.";
+            return "Активен тестовый режим. Для демонстрационной версии можно войти как admin / password или зарегистрировать нового игрока.";
         }
 
         private void SetLoginMessage(string message, bool isError = true)
@@ -487,6 +768,13 @@ namespace Tournaments.WPF.Views
             _sqlMessage = message;
             _isSqlMessageError = isError;
             ApplyMessageState(SqlMessageContainer, SqlMessageText, message, isError);
+        }
+
+        private void SetRegisterMessage(string message, bool isError = true)
+        {
+            _registerMessage = message;
+            _isRegisterMessageError = isError;
+            ApplyMessageState(RegisterMessageContainer, RegisterMessageText, message, isError);
         }
 
         private static void ApplyMessageState(System.Windows.Controls.Border container, System.Windows.Controls.TextBlock textBlock, string message, bool isError)
