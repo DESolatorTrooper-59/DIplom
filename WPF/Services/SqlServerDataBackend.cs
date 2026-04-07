@@ -62,23 +62,27 @@ namespace Tournaments.WPF.Services
 
         public bool ValidateLogin(string login, string password)
         {
+            return ValidateOrganizerLogin(login, password) || ValidatePlayerLogin(login, password);
+        }
+
+        public bool ValidateOrganizerLogin(string login, string password)
+        {
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlCommand command = connection.CreateCommand())
             {
-                command.CommandText = @"
-SELECT CASE
-    WHEN EXISTS (
-        SELECT 1
-        FROM [dbo].[Organizer]
-        WHERE [Login] = @Login AND [Password] = @Password
-    ) OR EXISTS (
-        SELECT 1
-        FROM [dbo].[Players]
-        WHERE [Nickname] = @Login AND [Password] = @Password
-    )
-    THEN 1
-    ELSE 0
-END";
+                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Organizer] WHERE [Login] = @Login AND [Password] = @Password";
+                AddParameter(command, "@Login", login);
+                AddParameter(command, "@Password", password);
+                return Convert.ToInt32(command.ExecuteScalar()) > 0;
+            }
+        }
+
+        public bool ValidatePlayerLogin(string login, string password)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Players] WHERE [Nickname] = @Login AND [Password] = @Password";
                 AddParameter(command, "@Login", login);
                 AddParameter(command, "@Password", password);
                 return Convert.ToInt32(command.ExecuteScalar()) > 0;

@@ -228,7 +228,7 @@ CREATE TABLE [dbo].[Matches]
     CONSTRAINT [FK_Matches_WinnerPlayer] FOREIGN KEY ([WinnerPlayerID])
         REFERENCES [dbo].[Players] ([PlayerID]),
     CONSTRAINT [UQ_Matches_Tournament_MatchNumber] UNIQUE ([TournamentID], [MatchNumber]),
-    CONSTRAINT [CHK_Matches_Status] CHECK ([Status] IN (N'Scheduled', N'Live', N'Completed', N'Cancelled')),
+    CONSTRAINT [CHK_Matches_Status] CHECK ([Status] IN (N'Scheduled', N'Completed')),
     CONSTRAINT [CHK_Matches_Teams] CHECK ([Team1ID] IS NULL OR [Team2ID] IS NULL OR [Team1ID] <> [Team2ID]),
     CONSTRAINT [CHK_Matches_Players] CHECK ([Player1ID] IS NULL OR [Player2ID] IS NULL OR [Player1ID] <> [Player2ID]),
     CONSTRAINT [CHK_Matches_Winner] CHECK ([WinnerTeamID] IS NULL OR [WinnerTeamID] = [Team1ID] OR [WinnerTeamID] = [Team2ID]),

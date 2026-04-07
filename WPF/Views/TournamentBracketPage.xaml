@@ -17,7 +17,8 @@
             CornerRadius="16">
       <StackPanel>
         <TextBlock Text="Турнирная сетка" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource PanelTextBrush}" />
-        <TextBlock Text="Просмотр и редактирование сетки по раундам: выберите матч, измените счет, статус и параметры встречи."
+        <TextBlock x:Name="HeaderDescriptionText"
+                   Text="Просмотр и редактирование сетки по раундам: выберите матч, измените счет, статус и параметры встречи."
                    Foreground="{DynamicResource PanelMutedTextBrush}"
                    Margin="0,6,0,0"
                    TextWrapping="Wrap" />
@@ -57,7 +58,7 @@
                     VerticalAlignment="Center"
                     SelectionChanged="TournamentComboBox_SelectionChanged" />
           <Button Grid.Column="2" Width="150" Height="38" VerticalAlignment="Center" Content="Показать сетку" Click="Preview_Click" />
-          <Button Grid.Column="3" Width="150" Height="38" VerticalAlignment="Center" Content="Создать сетку" Click="Generate_Click" />
+          <Button Grid.Column="3" x:Name="GenerateButton" Width="150" Height="38" VerticalAlignment="Center" Content="Создать сетку" Click="Generate_Click" />
           <Button Grid.Column="4" Width="140" Height="38" VerticalAlignment="Center" Content="Обновить" Style="{StaticResource GhostButtonStyle}" Click="RefreshTournaments_Click" />
         </Grid>
 
@@ -100,6 +101,7 @@
                        Foreground="{DynamicResource TextPrimaryBrush}"
                        VerticalAlignment="Center" />
             <Button Grid.Column="1"
+                    x:Name="OpenParticipantsButton"
                     Width="180"
                     Height="34"
                     Content="Добавить участников"
@@ -176,7 +178,7 @@
               </Grid.ColumnDefinitions>
 
               <StackPanel>
-                <TextBlock Text="Редактирование матча" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
+                <TextBlock x:Name="EditorTitleText" Text="Редактирование матча" FontSize="20" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" />
                 <TextBlock x:Name="EditorStateText"
                            Margin="0,6,0,0"
                            Foreground="{DynamicResource TextSecondaryBrush}"

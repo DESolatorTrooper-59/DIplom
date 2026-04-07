@@ -71,9 +71,7 @@ namespace Tournaments.WPF.Services
         {
             FieldDefinition status = new FieldDefinition("Status", "Статус", FieldType.Choice);
             status.AllowedValues.Add("Scheduled");
-            status.AllowedValues.Add("Live");
             status.AllowedValues.Add("Completed");
-            status.AllowedValues.Add("Cancelled");
 
             EntityDefinition definition = new EntityDefinition(
                 "Matches",
@@ -87,7 +85,10 @@ namespace Tournaments.WPF.Services
                     new FieldDefinition("MatchNumber", "Номер матча", FieldType.Integer) { IsRequired = true },
                     CreateLookupField("Team1ID", "Команда 1", "Teams", "TeamID", "TeamName"),
                     CreateLookupField("Team2ID", "Команда 2", "Teams", "TeamID", "TeamName"),
-                    CreateLookupField("WinnerTeamID", "Победитель", "Teams", "TeamID", "TeamName"),
+                    CreateLookupField("WinnerTeamID", "Победитель команды", "Teams", "TeamID", "TeamName"),
+                    CreateLookupField("Player1ID", "Игрок 1", "Players", "PlayerID", "Nickname"),
+                    CreateLookupField("Player2ID", "Игрок 2", "Players", "PlayerID", "Nickname"),
+                    CreateLookupField("WinnerPlayerID", "Победитель игрок", "Players", "PlayerID", "Nickname"),
                     new FieldDefinition("Team1Score", "Счёт команды 1", FieldType.Integer),
                     new FieldDefinition("Team2Score", "Счёт команды 2", FieldType.Integer),
                     new FieldDefinition("MatchDate", "Дата матча", FieldType.Text),
@@ -101,7 +102,12 @@ namespace Tournaments.WPF.Services
                 int stageId = GetInt(context.Values, "StageID");
                 int? team1Id = GetNullableInt(context.Values, "Team1ID");
                 int? team2Id = GetNullableInt(context.Values, "Team2ID");
-                int? winnerId = GetNullableInt(context.Values, "WinnerTeamID");
+                int? winnerTeamId = GetNullableInt(context.Values, "WinnerTeamID");
+                int? player1Id = GetNullableInt(context.Values, "Player1ID");
+                int? player2Id = GetNullableInt(context.Values, "Player2ID");
+                int? winnerPlayerId = GetNullableInt(context.Values, "WinnerPlayerID");
+                string statusValue = GetString(context.Values, "Status");
+                bool isPlayerMode = string.Equals(GetTournamentParticipantMode(context.Database, tournamentId), "Игроки", StringComparison.CurrentCultureIgnoreCase);
 
                 if (!context.Database.RecordExists("Tournaments", "TournamentID", tournamentId))
                 {
@@ -119,32 +125,81 @@ namespace Tournaments.WPF.Services
                     return EntityValidationResult.Fail("Выбранный этап не принадлежит указанному турниру.");
                 }
 
-                if (team1Id.HasValue && !context.Database.RecordExists("Teams", "TeamID", team1Id.Value))
+                if (isPlayerMode)
                 {
-                    return EntityValidationResult.Fail("Команды 1 с таким ID не существует.");
-                }
-
-                if (team2Id.HasValue && !context.Database.RecordExists("Teams", "TeamID", team2Id.Value))
-                {
-                    return EntityValidationResult.Fail("Команды 2 с таким ID не существует.");
-                }
-
-                if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
-                {
-                    return EntityValidationResult.Fail("Команды в матче должны быть разными.");
-                }
-
-                if (winnerId.HasValue)
-                {
-                    if (!context.Database.RecordExists("Teams", "TeamID", winnerId.Value))
+                    if (team1Id.HasValue || team2Id.HasValue || winnerTeamId.HasValue)
                     {
-                        return EntityValidationResult.Fail("Команды-победителя с таким ID не существует.");
+                        return EntityValidationResult.Fail("Для турнира формата \"Игроки\" поля команд должны оставаться пустыми.");
                     }
 
-                    if ((!team1Id.HasValue || winnerId.Value != team1Id.Value) && (!team2Id.HasValue || winnerId.Value != team2Id.Value))
+                    if (player1Id.HasValue && !context.Database.RecordExists("Players", "PlayerID", player1Id.Value))
                     {
-                        return EntityValidationResult.Fail("Победитель должен быть одной из команд матча.");
+                        return EntityValidationResult.Fail("Игрока 1 с таким ID не существует.");
                     }
+
+                    if (player2Id.HasValue && !context.Database.RecordExists("Players", "PlayerID", player2Id.Value))
+                    {
+                        return EntityValidationResult.Fail("Игрока 2 с таким ID не существует.");
+                    }
+
+                    if (player1Id.HasValue && player2Id.HasValue && player1Id.Value == player2Id.Value)
+                    {
+                        return EntityValidationResult.Fail("Игроки в матче должны быть разными.");
+                    }
+
+                    if (winnerPlayerId.HasValue)
+                    {
+                        if (!context.Database.RecordExists("Players", "PlayerID", winnerPlayerId.Value))
+                        {
+                            return EntityValidationResult.Fail("Игрока-победителя с таким ID не существует.");
+                        }
+
+                        if ((!player1Id.HasValue || winnerPlayerId.Value != player1Id.Value) && (!player2Id.HasValue || winnerPlayerId.Value != player2Id.Value))
+                        {
+                            return EntityValidationResult.Fail("Победитель должен быть одним из игроков матча.");
+                        }
+                    }
+                }
+                else
+                {
+                    if (player1Id.HasValue || player2Id.HasValue || winnerPlayerId.HasValue)
+                    {
+                        return EntityValidationResult.Fail("Для турнира формата \"Команды\" поля игроков должны оставаться пустыми.");
+                    }
+
+                    if (team1Id.HasValue && !context.Database.RecordExists("Teams", "TeamID", team1Id.Value))
+                    {
+                        return EntityValidationResult.Fail("Команды 1 с таким ID не существует.");
+                    }
+
+                    if (team2Id.HasValue && !context.Database.RecordExists("Teams", "TeamID", team2Id.Value))
+                    {
+                        return EntityValidationResult.Fail("Команды 2 с таким ID не существует.");
+                    }
+
+                    if (team1Id.HasValue && team2Id.HasValue && team1Id.Value == team2Id.Value)
+                    {
+                        return EntityValidationResult.Fail("Команды в матче должны быть разными.");
+                    }
+
+                    if (winnerTeamId.HasValue)
+                    {
+                        if (!context.Database.RecordExists("Teams", "TeamID", winnerTeamId.Value))
+                        {
+                            return EntityValidationResult.Fail("Команды-победителя с таким ID не существует.");
+                        }
+
+                        if ((!team1Id.HasValue || winnerTeamId.Value != team1Id.Value) && (!team2Id.HasValue || winnerTeamId.Value != team2Id.Value))
+                        {
+                            return EntityValidationResult.Fail("Победитель должен быть одной из команд матча.");
+                        }
+                    }
+                }
+
+                if (!string.Equals(statusValue, "Scheduled", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(statusValue, "Completed", StringComparison.OrdinalIgnoreCase))
+                {
+                    return EntityValidationResult.Fail("Статус матча может быть только Scheduled или Completed.");
                 }
 
                 return EntityValidationResult.Success();

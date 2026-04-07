@@ -214,7 +214,7 @@
                      Foreground="{DynamicResource TextPrimaryBrush}" />
           <TextBlock x:Name="SubtitleText"
                      Margin="0,8,0,0"
-                     Text="Войдите под своей учётной записью, чтобы открыть приложение."
+                     Text="Войдите как администратор или игрок, либо откройте приложение в режиме гостя."
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>
@@ -288,36 +288,45 @@
             <Grid Grid.Row="5" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
 
               <Button Grid.Column="0"
                       x:Name="LoginButton"
-                      Width="110"
+                      Width="92"
                       Margin="0"
                       HorizontalAlignment="Left"
                       Content="Войти"
                       Click="Login_Click" />
               <Button Grid.Column="2"
-                      x:Name="SqlModeButton"
-                      Width="140"
+                      x:Name="GuestLoginButton"
+                      Width="92"
                       Margin="0"
                       HorizontalAlignment="Left"
-                      Content="MS SQL Server"
+                      Content="Гость"
                       Style="{StaticResource GhostButtonStyle}"
-                      Click="SqlModeButton_Click" />
+                      Click="GuestLogin_Click" />
               <Button Grid.Column="4"
                       x:Name="RegisterModeButton"
-                      Width="120"
+                      Width="108"
                       Margin="0"
                       HorizontalAlignment="Left"
                       Content="Регистрация"
                       Style="{StaticResource GhostButtonStyle}"
                       Click="Register_Click" />
+              <Button Grid.Column="6"
+                      x:Name="SqlModeButton"
+                      Width="120"
+                      Margin="0"
+                      HorizontalAlignment="Left"
+                      Content="MS SQL Server"
+                      Style="{StaticResource GhostButtonStyle}"
+                      Click="SqlModeButton_Click" />
             </Grid>
           </Grid>
 

@@ -23,11 +23,6 @@ namespace Tournaments.WPF.Services
                 InMemoryDataStore clone = new InMemoryDataStore(false);
                 clone.InitializeSchema();
 
-                foreach (KeyValuePair<string, string> user in _users)
-                {
-                    clone._users[user.Key] = user.Value;
-                }
-
                 foreach (KeyValuePair<string, DataTable> tableEntry in _tables)
                 {
                     clone._tables[tableEntry.Key] = clone.PrepareTableCopy(tableEntry.Key, tableEntry.Value);

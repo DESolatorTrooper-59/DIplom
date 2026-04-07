@@ -90,16 +90,14 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            if (!_database.ValidateLogin(login, password))
+            UserRole? role = _database.AuthenticateUser(login, password);
+            if (!role.HasValue)
             {
                 SetLoginMessage("Неверный логин или пароль.");
                 return;
             }
 
-            MainWindow window = new MainWindow(_database, login);
-            Application.Current.MainWindow = window;
-            window.Show();
-            Close();
+            OpenMainWindow(login, role.Value);
         }
 
         private void Register_Click(object sender, RoutedEventArgs e)
@@ -131,6 +129,23 @@ namespace Tournaments.WPF.Views
             SwitchMode(LoginWindowMode.Login);
             ActivateTestMode(true);
             LoginTextBox.Focus();
+        }
+
+        private void GuestLogin_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isConnecting)
+            {
+                return;
+            }
+
+            SetLoginMessage(null);
+            if (_database == null)
+            {
+                SetLoginMessage("Хранилище приложения не инициализировано.");
+                return;
+            }
+
+            OpenMainWindow("Гость", UserRole.Guest);
         }
 
         private void ThemeToggleButton_Click(object sender, RoutedEventArgs e)
@@ -313,6 +328,14 @@ namespace Tournaments.WPF.Views
             bool useWindowsAuthentication = WindowsAuthCheckBox.IsChecked == true;
             SqlUserTextBox.IsEnabled = !useWindowsAuthentication;
             SqlPasswordTextBox.IsEnabled = !useWindowsAuthentication;
+        }
+
+        private void OpenMainWindow(string login, UserRole role)
+        {
+            MainWindow window = new MainWindow(_database, login, role);
+            Application.Current.MainWindow = window;
+            window.Show();
+            Close();
         }
 
         private string GetLoginPassword()
@@ -629,7 +652,7 @@ namespace Tournaments.WPF.Views
                     break;
                 default:
                     TitleText.Text = "Tournaments WPF";
-                    SubtitleText.Text = "Войдите под своей учётной записью, чтобы открыть приложение.";
+                    SubtitleText.Text = "Войдите как администратор или игрок, либо откройте приложение в режиме гостя.";
                     break;
             }
         }
@@ -641,6 +664,7 @@ namespace Tournaments.WPF.Views
             ConnectSqlButton.IsEnabled = !isConnecting;
             SqlModeButton.IsEnabled = !isConnecting;
             LoginButton.IsEnabled = !isConnecting;
+            GuestLoginButton.IsEnabled = !isConnecting;
             RegisterModeButton.IsEnabled = !isConnecting;
             TestModeButton.IsEnabled = !isConnecting;
             WindowsAuthCheckBox.IsEnabled = !isConnecting;
@@ -753,7 +777,7 @@ namespace Tournaments.WPF.Views
 
         private static string BuildTestModeMessage()
         {
-            return "Активен тестовый режим. Для демонстрационной версии можно войти как admin / password или зарегистрировать нового игрока.";
+            return "Активен тестовый режим. Для демонстрационной версии можно войти как admin / password, зарегистрировать нового игрока или открыть просмотр гостем.";
         }
 
         private void SetLoginMessage(string message, bool isError = true)

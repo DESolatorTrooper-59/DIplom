@@ -12,7 +12,6 @@ namespace Tournaments.WPF.Services
 
         private readonly object _syncRoot = new object();
         private readonly Dictionary<string, DataTable> _tables = new Dictionary<string, DataTable>(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _users = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _identityColumns = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, int> _nextIdentities = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -28,24 +27,49 @@ namespace Tournaments.WPF.Services
         {
             lock (_syncRoot)
             {
-                if (_users.ContainsKey(login))
+                DataTable organizers = GetRequiredTable("Organizer");
+                bool exists = organizers.Rows
+                    .Cast<DataRow>()
+                    .Any(row =>
+                        !IsNull(row["Login"]) &&
+                        string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase));
+
+                if (exists)
                 {
                     return;
                 }
 
-                _users[login] = password;
+                DataRow organizer = organizers.NewRow();
+                organizer["Login"] = login;
+                organizer["Password"] = password;
+                organizers.Rows.Add(organizer);
             }
         }
 
         public bool ValidateUser(string login, string password)
         {
+            return ValidateOrganizerUser(login, password) || ValidatePlayerUser(login, password);
+        }
+
+        public bool ValidateOrganizerUser(string login, string password)
+        {
             lock (_syncRoot)
             {
-                if (_users.TryGetValue(login, out string storedPassword) && string.Equals(storedPassword, password, StringComparison.Ordinal))
-                {
-                    return true;
-                }
+                DataTable organizers = GetRequiredTable("Organizer");
+                return organizers.Rows
+                    .Cast<DataRow>()
+                    .Any(row =>
+                        !IsNull(row["Login"]) &&
+                        !IsNull(row["Password"]) &&
+                        string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(Convert.ToString(row["Password"]), password, StringComparison.Ordinal));
+            }
+        }
 
+        public bool ValidatePlayerUser(string login, string password)
+        {
+            lock (_syncRoot)
+            {
                 DataTable players = GetRequiredTable("Players");
                 return players.Rows
                     .Cast<DataRow>()
@@ -523,6 +547,10 @@ namespace Tournaments.WPF.Services
         }
         private void InitializeSchema()
         {
+            CreateTable("Organizer", null,
+                Column("Login", typeof(string)),
+                Column("Password", typeof(string)));
+
             CreateTable("GameTitles", "GameID",
                 Column("GameID", typeof(int)),
                 Column("GameName", typeof(string)),

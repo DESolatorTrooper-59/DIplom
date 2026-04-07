@@ -49,6 +49,21 @@ namespace Tournaments.WPF.Services
             return _backend.ValidateLogin(login, password);
         }
 
+        public UserRole? AuthenticateUser(string login, string password)
+        {
+            if (_backend.ValidateOrganizerLogin(login, password))
+            {
+                return UserRole.Administrator;
+            }
+
+            if (_backend.ValidatePlayerLogin(login, password))
+            {
+                return UserRole.Player;
+            }
+
+            return null;
+        }
+
         public void EnsureOrganizerUser(string login, string password)
         {
             _backend.EnsureOrganizerUser(login, password);
@@ -80,6 +95,11 @@ namespace Tournaments.WPF.Services
                 throw new InvalidOperationException("Игрок с таким никнеймом уже существует.");
             }
 
+            if (RecordExists("Organizer", "Login", normalizedNickname))
+            {
+                throw new InvalidOperationException("Этот никнейм уже занят учетной записью администратора.");
+            }
+
             Insert("Players", new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Nickname"] = normalizedNickname,
@@ -88,6 +108,38 @@ namespace Tournaments.WPF.Services
                 ["BirthDate"] = birthDate.Date,
                 ["Password"] = normalizedPassword
             });
+        }
+
+        public UserProfileData GetUserProfile(string login, UserRole role)
+        {
+            switch (role)
+            {
+                case UserRole.Player:
+                    return GetPlayerProfile(login);
+                case UserRole.Administrator:
+                    return GetAdministratorProfile(login);
+                default:
+                    return new UserProfileData(UserRole.Guest, "Гость")
+                    {
+                        Nickname = "Гость",
+                        CanEditExtendedProfile = false,
+                        CanChangePassword = false
+                    };
+            }
+        }
+
+        public string UpdateUserProfile(UserRole role, string currentLogin, string nickname, string realName, string country, DateTime? birthDate, string newPassword)
+        {
+            switch (role)
+            {
+                case UserRole.Player:
+                    return UpdatePlayerProfile(currentLogin, nickname, realName, country, birthDate, newPassword);
+                case UserRole.Administrator:
+                    UpdateAdministratorPassword(currentLogin, newPassword);
+                    return currentLogin;
+                default:
+                    throw new InvalidOperationException("Гостевой профиль нельзя изменять.");
+            }
         }
 
         public bool RecordExists(string tableName, string columnName, object value)
@@ -243,6 +295,158 @@ namespace Tournaments.WPF.Services
         private static bool ContainsColumn(IReadOnlyCollection<string> columns, string columnName)
         {
             return columns.Any(column => string.Equals(column, columnName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private UserProfileData GetPlayerProfile(string login)
+        {
+            DataRow row = GetPlayerRowByNickname(login);
+            if (row == null)
+            {
+                throw new InvalidOperationException("Профиль игрока не найден.");
+            }
+
+            return new UserProfileData(UserRole.Player, login)
+            {
+                Nickname = Convert.ToString(row["Nickname"]),
+                RealName = row.Table.Columns.Contains("RealName") && row["RealName"] != DBNull.Value ? Convert.ToString(row["RealName"]) : string.Empty,
+                Country = row.Table.Columns.Contains("Country") && row["Country"] != DBNull.Value ? Convert.ToString(row["Country"]) : string.Empty,
+                BirthDate = row.Table.Columns.Contains("BirthDate") && row["BirthDate"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(row["BirthDate"]).Date : null,
+                CanEditExtendedProfile = true,
+                CanChangePassword = true
+            };
+        }
+
+        private UserProfileData GetAdministratorProfile(string login)
+        {
+            DataRow row = GetOrganizerRow(login);
+            if (row == null)
+            {
+                throw new InvalidOperationException("Профиль администратора не найден.");
+            }
+
+            return new UserProfileData(UserRole.Administrator, login)
+            {
+                Nickname = login,
+                CanEditExtendedProfile = false,
+                CanChangePassword = true
+            };
+        }
+
+        private string UpdatePlayerProfile(string currentLogin, string nickname, string realName, string country, DateTime? birthDate, string newPassword)
+        {
+            DataRow row = GetPlayerRowByNickname(currentLogin);
+            if (row == null)
+            {
+                throw new InvalidOperationException("Профиль игрока не найден.");
+            }
+
+            string normalizedNickname = (nickname ?? string.Empty).Trim();
+            string normalizedRealName = string.IsNullOrWhiteSpace(realName) ? HiddenPlayerName : realName.Trim();
+            string normalizedCountry = string.IsNullOrWhiteSpace(country) ? UnspecifiedCountry : country.Trim();
+
+            if (string.IsNullOrWhiteSpace(normalizedNickname))
+            {
+                throw new InvalidOperationException("Никнейм не может быть пустым.");
+            }
+
+            if (!birthDate.HasValue)
+            {
+                throw new InvalidOperationException("Укажите дату рождения.");
+            }
+
+            if (birthDate.Value.Date > DateTime.Today)
+            {
+                throw new InvalidOperationException("Дата рождения не может быть больше текущей даты.");
+            }
+
+            int playerId = Convert.ToInt32(row["PlayerID"]);
+            if (NicknameExistsForAnotherPlayer(normalizedNickname, playerId))
+            {
+                throw new InvalidOperationException("Игрок с таким никнеймом уже существует.");
+            }
+
+            if (!string.Equals(currentLogin, normalizedNickname, StringComparison.OrdinalIgnoreCase) &&
+                RecordExists("Organizer", "Login", normalizedNickname))
+            {
+                throw new InvalidOperationException("Этот никнейм уже занят учетной записью администратора.");
+            }
+
+            string passwordToSave = string.IsNullOrWhiteSpace(newPassword)
+                ? Convert.ToString(row["Password"])
+                : newPassword;
+
+            Update("Players",
+                new[] { "PlayerID" },
+                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Nickname"] = normalizedNickname,
+                    ["RealName"] = normalizedRealName,
+                    ["Country"] = normalizedCountry,
+                    ["BirthDate"] = birthDate.Value.Date,
+                    ["Password"] = passwordToSave
+                },
+                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["PlayerID"] = playerId
+                });
+
+            return normalizedNickname;
+        }
+
+        private void UpdateAdministratorPassword(string currentLogin, string newPassword)
+        {
+            if (string.IsNullOrWhiteSpace(newPassword))
+            {
+                return;
+            }
+
+            DataRow row = GetOrganizerRow(currentLogin);
+            if (row == null)
+            {
+                throw new InvalidOperationException("Профиль администратора не найден.");
+            }
+
+            Update("Organizer",
+                new[] { "Login" },
+                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Password"] = newPassword
+                },
+                new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["Login"] = currentLogin
+                });
+        }
+
+        private bool NicknameExistsForAnotherPlayer(string nickname, int currentPlayerId)
+        {
+            DataTable players = GetTable("Players");
+            return players.Rows
+                .Cast<DataRow>()
+                .Any(row =>
+                    row["Nickname"] != DBNull.Value &&
+                    string.Equals(Convert.ToString(row["Nickname"]), nickname, StringComparison.OrdinalIgnoreCase) &&
+                    Convert.ToInt32(row["PlayerID"]) != currentPlayerId);
+        }
+
+        private DataRow GetPlayerRowByNickname(string nickname)
+        {
+            DataTable players = GetTable("Players");
+            return players.Rows
+                .Cast<DataRow>()
+                .FirstOrDefault(row =>
+                    row["Nickname"] != DBNull.Value &&
+                    string.Equals(Convert.ToString(row["Nickname"]), nickname, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private DataRow GetOrganizerRow(string login)
+        {
+            DataTable organizers = GetTable("Organizer");
+            return organizers.Rows
+                .Cast<DataRow>()
+                .FirstOrDefault(row =>
+                    row["Login"] != DBNull.Value &&
+                    string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

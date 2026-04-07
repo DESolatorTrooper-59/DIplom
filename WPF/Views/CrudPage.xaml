@@ -18,7 +18,8 @@
             CornerRadius="16">
       <StackPanel>
         <TextBlock x:Name="TitleText" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource PanelTextBrush}" />
-        <TextBlock Text="Добавление, редактирование, удаление, импорт CSV и быстрый поиск по выбранной сущности."
+        <TextBlock x:Name="SubtitleText"
+                   Text="Добавление, редактирование, удаление, импорт CSV и быстрый поиск по выбранной сущности."
                    Foreground="{DynamicResource PanelMutedTextBrush}"
                    Margin="0,6,0,0" />
       </StackPanel>
@@ -63,9 +64,9 @@
           </TextBlock>
         </Grid>
 
-        <Button Grid.Column="1" Width="120" Height="38" VerticalAlignment="Center" Content="Добавить" Click="Add_Click" />
-        <Button Grid.Column="2" Width="120" Height="38" VerticalAlignment="Center" Content="Изменить" Click="Edit_Click" />
-        <Button Grid.Column="3" Width="120" Height="38" VerticalAlignment="Center" Content="Удалить" Click="Delete_Click" />
+        <Button Grid.Column="1" x:Name="AddButton" Width="120" Height="38" VerticalAlignment="Center" Content="Добавить" Click="Add_Click" />
+        <Button Grid.Column="2" x:Name="EditButton" Width="120" Height="38" VerticalAlignment="Center" Content="Изменить" Click="Edit_Click" />
+        <Button Grid.Column="3" x:Name="DeleteButton" Width="120" Height="38" VerticalAlignment="Center" Content="Удалить" Click="Delete_Click" />
       </Grid>
     </Border>
 
@@ -95,9 +96,10 @@
                IsReadOnlyCaretVisible="True"
                ToolTip="Текст строки состояния можно выделить и скопировать." />
       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-        <Button Width="140" Content="Импорт CSV" Style="{StaticResource GhostButtonStyle}" Click="Import_Click" />
-        <Button Width="150" Content="Экспорт CSV" Style="{StaticResource GhostButtonStyle}" Click="Export_Click" />
-        <Button Width="110" Margin="0,0,0,0" Content="Обновить" Style="{StaticResource GhostButtonStyle}" Click="Refresh_Click" />
+        <Button x:Name="MatchViewToggleButton" Width="170" Content="Формат: Команды" Style="{StaticResource GhostButtonStyle}" Click="MatchViewToggleButton_Click" Visibility="Collapsed" />
+        <Button x:Name="ImportButton" Width="140" Content="Импорт CSV" Style="{StaticResource GhostButtonStyle}" Click="Import_Click" />
+        <Button x:Name="ExportButton" Width="150" Content="Экспорт CSV" Style="{StaticResource GhostButtonStyle}" Click="Export_Click" />
+        <Button x:Name="RefreshButton" Width="110" Margin="0,0,0,0" Content="Обновить" Style="{StaticResource GhostButtonStyle}" Click="Refresh_Click" />
       </StackPanel>
     </DockPanel>
   </Grid>

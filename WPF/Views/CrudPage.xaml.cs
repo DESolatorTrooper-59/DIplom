@@ -17,10 +17,32 @@ namespace Tournaments.WPF.Views
 {
     public partial class CrudPage : UserControl
     {
+        private enum MatchTournamentViewMode
+        {
+            Teams,
+            Players
+        }
+
+        private static readonly HashSet<string> TeamMatchParticipantColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Team1ID",
+            "Team2ID",
+            "WinnerTeamID"
+        };
+
+        private static readonly HashSet<string> PlayerMatchParticipantColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Player1ID",
+            "Player2ID",
+            "WinnerPlayerID"
+        };
+
         private readonly DatabaseService _database;
         private readonly EntityCrudService _crud;
         private readonly EntityDefinition _definition;
         private readonly string _currentLogin;
+        private readonly UserRole _currentRole;
+        private readonly bool _supportsMatchFormatToggle;
         private readonly SearchMatchBackgroundConverter _searchMatchBackgroundConverter = new SearchMatchBackgroundConverter();
         private readonly DbNullValueConverter _dbNullValueConverter = new DbNullValueConverter();
         private readonly Dictionary<string, IReadOnlyList<LookupOption>> _lookupOptions = new Dictionary<string, IReadOnlyList<LookupOption>>(StringComparer.OrdinalIgnoreCase);
@@ -30,15 +52,20 @@ namespace Tournaments.WPF.Views
         private DataRow _pendingEditRow;
         private Dictionary<string, object> _pendingEditOriginalValues;
         private bool _isFinalizingPendingChange;
+        private MatchTournamentViewMode _matchViewMode = MatchTournamentViewMode.Teams;
 
-        public CrudPage(DatabaseService database, EntityCrudService crud, EntityDefinition definition, string currentLogin)
+        public CrudPage(DatabaseService database, EntityCrudService crud, EntityDefinition definition, string currentLogin, UserRole currentRole)
         {
             InitializeComponent();
             _database = database;
             _crud = crud;
             _definition = definition;
             _currentLogin = currentLogin;
+            _currentRole = currentRole;
+            _supportsMatchFormatToggle = DetectMatchFormatToggleSupport();
             TitleText.Text = definition.Title;
+            UpdateMatchViewToggleButton();
+            ApplyRoleAccess();
             Loaded += CrudPage_Loaded;
         }
 
@@ -62,7 +89,7 @@ namespace Tournaments.WPF.Views
                 _pendingEditOriginalValues = null;
                 _sourceTable = _crud.Load(_definition);
                 _lookupOptions.Clear();
-                GridItems.ItemsSource = _sourceTable.DefaultView;
+                RefreshGridItemsSource();
                 ApplyFilter();
             }
             catch (Exception ex)
@@ -86,15 +113,29 @@ namespace Tournaments.WPF.Views
                 GridItems.ItemsSource = dataView;
             }
 
-            dataView.RowFilter = TextSearchService.BuildRowFilter(_sourceTable, SearchTextBox.Text);
+            dataView.RowFilter = CombineFilters(
+                BuildMatchTournamentFilter(),
+                TextSearchService.BuildRowFilter(_sourceTable, SearchTextBox.Text));
             int count = dataView.Count;
+            string summary = BuildStatusSummary(count);
             StatusText.Text = string.IsNullOrWhiteSpace(note)
-                ? "Записей: " + count
-                : "Записей: " + count + " • " + note;
+                ? summary
+                : summary + " • " + note;
         }
 
         private void Add_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageData())
+            {
+                return;
+            }
+
+            if (_supportsMatchFormatToggle && !HasAvailableTournamentForCurrentMatchView())
+            {
+                MessageBox.Show("Для режима \"" + GetCurrentMatchViewTitle() + "\" нет доступных турниров.", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             try
             {
                 CompletePendingChangeIfAny();
@@ -141,6 +182,11 @@ namespace Tournaments.WPF.Views
 
         private void Edit_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageData())
+            {
+                return;
+            }
+
             try
             {
                 CompletePendingChangeIfAny();
@@ -176,6 +222,11 @@ namespace Tournaments.WPF.Views
 
         private void Delete_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageData())
+            {
+                return;
+            }
+
             if (HasPendingInsertRow() && IsPendingRowSelected())
             {
                 RemovePendingInsertRow("Новая строка удалена.");
@@ -320,8 +371,30 @@ namespace Tournaments.WPF.Views
             LoadData();
         }
 
+        private void MatchViewToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_supportsMatchFormatToggle)
+            {
+                return;
+            }
+
+            CompletePendingChangeIfAny();
+            _matchViewMode = _matchViewMode == MatchTournamentViewMode.Teams
+                ? MatchTournamentViewMode.Players
+                : MatchTournamentViewMode.Teams;
+            _lookupOptions.Clear();
+            UpdateMatchViewToggleButton();
+            RefreshGridItemsSource();
+            ApplyFilter();
+        }
+
         private void Import_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageData())
+            {
+                return;
+            }
+
             try
             {
                 CompletePendingChangeIfAny();
@@ -358,6 +431,11 @@ namespace Tournaments.WPF.Views
 
         private void Export_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageData())
+            {
+                return;
+            }
+
             CompletePendingChangeIfAny();
 
             DataView view = GridItems.ItemsSource as DataView;
@@ -393,7 +471,7 @@ namespace Tournaments.WPF.Views
         }
         private void GridItems_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
         {
-            FieldDefinition field = _definition.Fields.FirstOrDefault(item => item.Name == e.PropertyName);
+            FieldDefinition field = GetVisibleField(e.PropertyName);
             if (field == null)
             {
                 e.Cancel = true;
@@ -415,7 +493,7 @@ namespace Tournaments.WPF.Views
 
             e.Column.Header = field.Label;
             e.Column.SortMemberPath = field.Name;
-            e.Column.IsReadOnly = field.IsReadOnly || field.IsIdentity;
+            e.Column.IsReadOnly = !CanManageData() || field.IsReadOnly || field.IsIdentity;
             ApplySearchHighlightStyle(e.Column, e.PropertyName);
 
             DataGridTextColumn textColumn = e.Column as DataGridTextColumn;
@@ -519,7 +597,7 @@ namespace Tournaments.WPF.Views
 
         private void GridItems_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (HasPendingChange())
+            if (!CanManageData() || HasPendingChange())
             {
                 return;
             }
@@ -812,6 +890,17 @@ namespace Tournaments.WPF.Views
                 }
             }
 
+            if (_supportsMatchFormatToggle &&
+                _sourceTable.Columns.Contains("TournamentID") &&
+                row["TournamentID"] == DBNull.Value)
+            {
+                int? tournamentId = GetDefaultTournamentIdForCurrentMatchView();
+                if (tournamentId.HasValue)
+                {
+                    row["TournamentID"] = tournamentId.Value;
+                }
+            }
+
             if (string.Equals(_definition.TableName, "Players", StringComparison.OrdinalIgnoreCase) &&
                 _sourceTable.Columns.Contains("RealName") &&
                 row["RealName"] == DBNull.Value)
@@ -863,6 +952,183 @@ namespace Tournaments.WPF.Views
             return _definition.Fields
                 .Where(field => !field.IsIdentity && !field.IsReadOnly)
                 .ToList();
+        }
+
+        private bool CanManageData()
+        {
+            return AccessPolicy.CanManageData(_currentRole);
+        }
+
+        private void ApplyRoleAccess()
+        {
+            bool canManageData = CanManageData();
+            GridItems.IsReadOnly = !canManageData;
+            AddButton.Visibility = canManageData ? Visibility.Visible : Visibility.Collapsed;
+            EditButton.Visibility = canManageData ? Visibility.Visible : Visibility.Collapsed;
+            DeleteButton.Visibility = canManageData ? Visibility.Visible : Visibility.Collapsed;
+            ImportButton.Visibility = canManageData ? Visibility.Visible : Visibility.Collapsed;
+            ExportButton.Visibility = canManageData ? Visibility.Visible : Visibility.Collapsed;
+            SubtitleText.Text = canManageData
+                ? "Добавление, редактирование, удаление, импорт CSV и быстрый поиск по выбранной сущности."
+                : "Доступен режим просмотра. Изменение данных и CSV-операции доступны только администратору.";
+        }
+
+        private bool DetectMatchFormatToggleSupport()
+        {
+            return string.Equals(_definition.TableName, "Matches", StringComparison.OrdinalIgnoreCase) &&
+                   HasField("TournamentID") &&
+                   HasField("Team1ID") &&
+                   HasField("Team2ID") &&
+                   HasField("WinnerTeamID") &&
+                   HasField("Player1ID") &&
+                   HasField("Player2ID") &&
+                   HasField("WinnerPlayerID") &&
+                   _database.GetAvailableColumns("Tournaments").Any(column => string.Equals(column, "ParticipantMode", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool HasField(string fieldName)
+        {
+            return _definition.Fields.Any(field => string.Equals(field.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private void UpdateMatchViewToggleButton()
+        {
+            MatchViewToggleButton.Visibility = _supportsMatchFormatToggle ? Visibility.Visible : Visibility.Collapsed;
+            if (!_supportsMatchFormatToggle)
+            {
+                return;
+            }
+
+            string currentViewTitle = GetCurrentMatchViewTitle();
+            string targetViewTitle = _matchViewMode == MatchTournamentViewMode.Teams ? "Игроки" : "Команды";
+            MatchViewToggleButton.Content = "Формат: " + currentViewTitle;
+            MatchViewToggleButton.ToolTip = "Сейчас показаны турниры формата \"" + currentViewTitle + "\". Нажмите, чтобы переключиться на \"" + targetViewTitle + "\".";
+        }
+
+        private string GetCurrentMatchViewTitle()
+        {
+            return _matchViewMode == MatchTournamentViewMode.Teams ? "Команды" : "Игроки";
+        }
+
+        private string BuildStatusSummary(int count)
+        {
+            return _supportsMatchFormatToggle
+                ? "Записей: " + count + " • Формат турниров: " + GetCurrentMatchViewTitle()
+                : "Записей: " + count;
+        }
+
+        private void RefreshGridItemsSource()
+        {
+            GridItems.ItemsSource = null;
+            GridItems.Columns.Clear();
+
+            if (_sourceTable == null)
+            {
+                return;
+            }
+
+            GridItems.ItemsSource = _sourceTable.DefaultView;
+        }
+
+        private string BuildMatchTournamentFilter()
+        {
+            if (!_supportsMatchFormatToggle || _sourceTable == null || !_sourceTable.Columns.Contains("TournamentID"))
+            {
+                return string.Empty;
+            }
+
+            List<int> tournamentIds = GetTournamentIdsForCurrentMatchView().Distinct().OrderBy(id => id).ToList();
+            if (tournamentIds.Count == 0)
+            {
+                return "1 = 0";
+            }
+
+            return "[TournamentID] IN (" + string.Join(", ", tournamentIds) + ")";
+        }
+
+        private IEnumerable<int> GetTournamentIdsForCurrentMatchView()
+        {
+            DataTable tournaments = _database.GetTable("Tournaments");
+            if (!tournaments.Columns.Contains("TournamentID"))
+            {
+                return Enumerable.Empty<int>();
+            }
+
+            bool showPlayerMode = _matchViewMode == MatchTournamentViewMode.Players;
+            return tournaments.Rows
+                .Cast<DataRow>()
+                .Where(row => row["TournamentID"] != DBNull.Value && TournamentMatchesView(row, showPlayerMode))
+                .Select(row => Convert.ToInt32(row["TournamentID"]))
+                .ToList();
+        }
+
+        private bool HasAvailableTournamentForCurrentMatchView()
+        {
+            return !_supportsMatchFormatToggle || GetTournamentIdsForCurrentMatchView().Any();
+        }
+
+        private int? GetDefaultTournamentIdForCurrentMatchView()
+        {
+            return GetTournamentIdsForCurrentMatchView()
+                .Select(id => (int?)id)
+                .FirstOrDefault();
+        }
+
+        private static bool TournamentMatchesView(DataRow tournamentRow, bool showPlayerMode)
+        {
+            string participantMode = GetParticipantMode(tournamentRow);
+            return showPlayerMode
+                ? string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
+                : !string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase);
+        }
+
+        private static string GetParticipantMode(DataRow tournamentRow)
+        {
+            if (tournamentRow == null ||
+                !tournamentRow.Table.Columns.Contains("ParticipantMode") ||
+                tournamentRow["ParticipantMode"] == DBNull.Value)
+            {
+                return "Команды";
+            }
+
+            string participantMode = Convert.ToString(tournamentRow["ParticipantMode"]);
+            return string.IsNullOrWhiteSpace(participantMode) ? "Команды" : participantMode.Trim();
+        }
+
+        private static string CombineFilters(params string[] filters)
+        {
+            List<string> parts = filters
+                .Where(filter => !string.IsNullOrWhiteSpace(filter))
+                .Select(filter => "(" + filter + ")")
+                .ToList();
+
+            return parts.Count == 0 ? string.Empty : string.Join(" AND ", parts);
+        }
+
+        private FieldDefinition GetVisibleField(string fieldName)
+        {
+            FieldDefinition field = _definition.Fields.FirstOrDefault(item => string.Equals(item.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                return null;
+            }
+
+            if (!_supportsMatchFormatToggle)
+            {
+                return field;
+            }
+
+            if (_matchViewMode == MatchTournamentViewMode.Teams && PlayerMatchParticipantColumns.Contains(field.Name))
+            {
+                return null;
+            }
+
+            if (_matchViewMode == MatchTournamentViewMode.Players && TeamMatchParticipantColumns.Contains(field.Name))
+            {
+                return null;
+            }
+
+            return field;
         }
 
         private void SelectLastRow()
@@ -1082,6 +1348,19 @@ namespace Tournaments.WPF.Views
                         row[field.LookupColumnName],
                         BuildLookupDisplayText(row, field.LookupColumnName, displayColumnName)))
                     .ToList();
+
+                if (_supportsMatchFormatToggle && string.Equals(field.Name, "TournamentID", StringComparison.OrdinalIgnoreCase))
+                {
+                    bool showPlayerMode = _matchViewMode == MatchTournamentViewMode.Players;
+                    options = lookupTable.Rows
+                        .Cast<DataRow>()
+                        .Where(row => row[field.LookupColumnName] != DBNull.Value && TournamentMatchesView(row, showPlayerMode))
+                        .OrderBy(row => Convert.ToString(row[field.LookupColumnName]))
+                        .Select(row => new LookupOption(
+                            row[field.LookupColumnName],
+                            BuildLookupDisplayText(row, field.LookupColumnName, displayColumnName)))
+                        .ToList();
+                }
 
                 if (!field.IsRequired)
                 {

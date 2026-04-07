@@ -40,6 +40,16 @@ namespace Tournaments.WPF.Services
             return _store.ValidateUser(login, password);
         }
 
+        public bool ValidateOrganizerLogin(string login, string password)
+        {
+            return _store.ValidateOrganizerUser(login, password);
+        }
+
+        public bool ValidatePlayerLogin(string login, string password)
+        {
+            return _store.ValidatePlayerUser(login, password);
+        }
+
         public void EnsureOrganizerUser(string login, string password)
         {
             _store.EnsureUser(login, password);

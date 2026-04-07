@@ -28,7 +28,6 @@ namespace Tournaments.WPF.Views
         private static readonly List<StatusOption> StatusOptions = new List<StatusOption>
         {
             new StatusOption("Scheduled", "Запланирован"),
-            new StatusOption("In Progress", "Идет"),
             new StatusOption("Completed", "Завершен")
         };
 
@@ -36,6 +35,7 @@ namespace Tournaments.WPF.Views
 
         private readonly DatabaseService _database;
         private readonly TournamentBracketService _bracketService;
+        private readonly UserRole _currentRole;
         private bool _isLoaded;
         private int _currentRoundCount;
         private TournamentBracketSnapshot _currentSnapshot;
@@ -43,11 +43,12 @@ namespace Tournaments.WPF.Views
         private List<BracketTeamOption> _teamOptions = new List<BracketTeamOption>();
         private bool _isUpdatingEditor;
 
-        public TournamentBracketPage(DatabaseService database)
+        public TournamentBracketPage(DatabaseService database, UserRole currentRole)
         {
             InitializeComponent();
             _database = database;
             _bracketService = new TournamentBracketService(database);
+            _currentRole = currentRole;
             Loaded += TournamentBracketPage_Loaded;
 
             StatusComboBox.ItemsSource = StatusOptions;
@@ -55,6 +56,7 @@ namespace Tournaments.WPF.Views
             StatusComboBox.SelectedValuePath = "Value";
             BestOfComboBox.ItemsSource = BestOfOptions;
             EditorSelectionText.Text = "Матч не выбран";
+            ApplyRoleAccess();
         }
 
         private void TournamentBracketPage_Loaded(object sender, RoutedEventArgs e)
@@ -98,6 +100,11 @@ namespace Tournaments.WPF.Views
 
         private void Generate_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageBracket())
+            {
+                return;
+            }
+
             int? tournamentId = GetSelectedTournamentId();
             if (!tournamentId.HasValue)
             {
@@ -133,6 +140,11 @@ namespace Tournaments.WPF.Views
 
         private void OpenParticipants_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageBracket())
+            {
+                return;
+            }
+
             MainWindow mainWindow = Window.GetWindow(this) as MainWindow;
             if (mainWindow != null && mainWindow.OpenEntityPage("TournamentParticipants"))
             {
@@ -144,6 +156,11 @@ namespace Tournaments.WPF.Views
 
         private void SaveMatch_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageBracket())
+            {
+                return;
+            }
+
             if (_selectedMatch == null)
             {
                 return;
@@ -209,6 +226,11 @@ namespace Tournaments.WPF.Views
 
         private void CancelEdit_Click(object sender, RoutedEventArgs e)
         {
+            if (!CanManageBracket())
+            {
+                return;
+            }
+
             if (_selectedMatch == null)
             {
                 return;
@@ -230,6 +252,11 @@ namespace Tournaments.WPF.Views
 
         private void MatchCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
+            if (!CanManageBracket())
+            {
+                return;
+            }
+
             if (!(sender is Border border) || !(border.Tag is BracketMatchViewModel match))
             {
                 return;
@@ -376,7 +403,8 @@ namespace Tournaments.WPF.Views
             Grid.SetRow(metaPanel, 1);
             grid.Children.Add(metaPanel);
 
-            bool isSelected = _selectedMatch != null && match.MatchId != 0 && _selectedMatch.MatchId == match.MatchId;
+            bool canManageBracket = CanManageBracket();
+            bool isSelected = canManageBracket && _selectedMatch != null && match.MatchId != 0 && _selectedMatch.MatchId == match.MatchId;
             Border card = new Border
             {
                 Width = MatchWidth,
@@ -391,13 +419,15 @@ namespace Tournaments.WPF.Views
                     : ThemeBrush("BracketMatchCardBackgroundBrush", Brushes.White),
                 Child = grid,
                 Tag = match,
-                Cursor = match.IsEditable ? Cursors.Hand : Cursors.Arrow,
-                ToolTip = match.IsEditable
-                    ? "Нажмите, чтобы отредактировать матч"
-                    : "Редактирование станет доступно после создания сетки"
+                Cursor = canManageBracket && match.IsEditable ? Cursors.Hand : Cursors.Arrow,
+                ToolTip = canManageBracket
+                    ? (match.IsEditable
+                        ? "Нажмите, чтобы отредактировать матч"
+                        : "Редактирование станет доступно после создания сетки")
+                    : "Доступен только просмотр сетки"
             };
 
-            if (match.IsEditable)
+            if (canManageBracket && match.IsEditable)
             {
                 card.MouseLeftButtonUp += MatchCard_MouseLeftButtonUp;
             }
@@ -576,6 +606,12 @@ namespace Tournaments.WPF.Views
 
         private void UpdateEditorState()
         {
+            if (!CanManageBracket())
+            {
+                ClearEditor("Доступен режим просмотра. Создание сетки, управление участниками и редактирование матчей доступны только администратору.");
+                return;
+            }
+
             if (_currentSnapshot == null || !_currentSnapshot.HasGeneratedBracket)
             {
                 ClearEditor("Редактирование станет доступно после создания формата для выбранного турнира.");
@@ -755,7 +791,7 @@ namespace Tournaments.WPF.Views
             return _currentSnapshot.Rounds[roundIndex].Title;
         }
 
-        private static string BuildSummary(TournamentBracketSnapshot snapshot)
+        private string BuildSummary(TournamentBracketSnapshot snapshot)
         {
             if (string.IsNullOrWhiteSpace(snapshot.TournamentName))
             {
@@ -763,13 +799,18 @@ namespace Tournaments.WPF.Views
             }
 
             bool isLeague = string.Equals(snapshot.FormatType, "League", StringComparison.OrdinalIgnoreCase);
+            bool canManageBracket = CanManageBracket();
             string modeText = snapshot.HasGeneratedBracket
-                ? (isLeague
-                    ? "Расписание сохранено. Можно редактировать результаты матчей и автоматически пересчитывать таблицу."
-                    : "Сетка сохранена. Кликните по матчу, чтобы изменить его и автоматически обновить зависимые встречи.")
-                : (isLeague
-                    ? "Пока показан предпросмотр расписания. Нажмите «Создать сетку», чтобы сохранить матчи и включить редактирование."
-                    : "Пока показан предпросмотр сетки. Нажмите «Создать сетку», чтобы сохранить ее и включить редактирование.");
+                ? (canManageBracket
+                    ? (isLeague
+                        ? "Расписание сохранено. Можно редактировать результаты матчей и автоматически пересчитывать таблицу."
+                        : "Сетка сохранена. Кликните по матчу, чтобы изменить его и автоматически обновить зависимые встречи.")
+                    : "Сетка сохранена и доступна только для просмотра.")
+                : (canManageBracket
+                    ? (isLeague
+                        ? "Пока показан предпросмотр расписания. Нажмите «Создать сетку», чтобы сохранить матчи и включить редактирование."
+                        : "Пока показан предпросмотр сетки. Нажмите «Создать сетку», чтобы сохранить ее и включить редактирование.")
+                    : "Пока показан предпросмотр сетки. Создание и редактирование доступны только администратору.");
 
             if (isLeague)
             {
@@ -777,6 +818,24 @@ namespace Tournaments.WPF.Views
             }
 
             return snapshot.TournamentName + ": формат " + snapshot.FormatType + ", участников " + snapshot.ParticipantCount + ", размер сетки " + snapshot.BracketSize + ", матчей " + snapshot.MatchCount + ". " + modeText;
+        }
+
+        private bool CanManageBracket()
+        {
+            return AccessPolicy.CanManageBracket(_currentRole);
+        }
+
+        private void ApplyRoleAccess()
+        {
+            bool canManageBracket = CanManageBracket();
+            HeaderDescriptionText.Text = canManageBracket
+                ? "Просмотр и редактирование сетки по раундам: выберите матч, измените счет, статус и параметры встречи."
+                : "Просмотр сетки по раундам и состава участников выбранного турнира.";
+            EditorTitleText.Text = canManageBracket ? "Редактирование матча" : "Режим просмотра";
+            GenerateButton.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
+            OpenParticipantsButton.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
+            EditorFieldsGrid.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
+            TeamEditHintText.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private static bool TryParseNonNegativeInt(string text, out int value)
@@ -792,9 +851,6 @@ namespace Tournaments.WPF.Views
             {
                 case "completed":
                     return "Completed";
-                case "in progress":
-                case "inprogress":
-                    return "In Progress";
                 default:
                     return "Scheduled";
             }

@@ -12,22 +12,24 @@ namespace Tournaments.WPF.Views
     {
         private readonly DatabaseService _database;
         private readonly EntityCrudService _crud;
-        private readonly string _login;
+        private string _currentLogin;
+        private readonly UserRole _role;
 
-        public MainWindow(DatabaseService database, string login)
+        public MainWindow(DatabaseService database, string login, UserRole role)
         {
             InitializeComponent();
             _database = database;
             _crud = new EntityCrudService(database);
-            _login = login;
+            _currentLogin = login;
+            _role = role;
             UpdateThemeToggleState();
             Loaded += MainWindow_Loaded;
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            UserText.Text = "Учетная запись: " + _login + "\nРежим: " + _database.ModeTitle + "\nХранилище: " + _database.StorageLabel;
-            EntitiesList.ItemsSource = BuildNavigationItems();
+            RefreshAccountPanel();
+            EntitiesList.ItemsSource = BuildNavigationItems(_role);
             EntitiesList.DisplayMemberPath = "Title";
             if (EntitiesList.Items.Count > 0)
             {
@@ -79,13 +81,13 @@ namespace Tournaments.WPF.Views
 
             if (item.PageKey == "Bracket")
             {
-                PageHost.Content = new TournamentBracketPage(_database);
+                PageHost.Content = new TournamentBracketPage(_database, _role);
                 return;
             }
 
             if (item.EntityDefinition != null)
             {
-                PageHost.Content = new CrudPage(_database, _crud, _database.GetEffectiveDefinition(item.EntityDefinition), _login);
+                PageHost.Content = new CrudPage(_database, _crud, _database.GetEffectiveDefinition(item.EntityDefinition), _currentLogin, _role);
             }
         }
 
@@ -103,6 +105,32 @@ namespace Tournaments.WPF.Views
             UpdateThemeToggleState();
         }
 
+        private void ProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_role == UserRole.Guest)
+            {
+                return;
+            }
+
+            try
+            {
+                UserProfileWindow profileWindow = new UserProfileWindow(_database, _currentLogin, _role)
+                {
+                    Owner = this
+                };
+
+                if (profileWindow.ShowDialog() == true)
+                {
+                    _currentLogin = profileWindow.UpdatedLogin;
+                    RefreshAccountPanel();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось открыть профиль: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private void UpdateThemeToggleState()
         {
             bool isLightTheme = ThemeManager.CurrentTheme == AppTheme.Light;
@@ -112,14 +140,49 @@ namespace Tournaments.WPF.Views
                 : "Тёмная тема активна. Нажмите, чтобы включить светлую.";
         }
 
-        private static List<NavigationItem> BuildNavigationItems()
+        private void RefreshAccountPanel()
         {
-            List<NavigationItem> items = new List<NavigationItem>
-            {
-                NavigationItem.ForBracket()
-            };
+            string displayName = AccessPolicy.GetAccountTitle(_currentLogin, _role);
+            bool canOpenProfile = _role != UserRole.Guest;
 
-            items.AddRange(EntityRegistry.All.Select(NavigationItem.ForEntity));
+            if (canOpenProfile)
+            {
+                try
+                {
+                    UserProfileData profile = _database.GetUserProfile(_currentLogin, _role);
+                    if (!string.IsNullOrWhiteSpace(profile.Nickname))
+                    {
+                        displayName = profile.Nickname;
+                    }
+
+                    ProfileButton.IsEnabled = profile.CanEditExtendedProfile || profile.CanChangePassword;
+                }
+                catch
+                {
+                    ProfileButton.IsEnabled = false;
+                }
+            }
+
+            ProfileButton.Visibility = canOpenProfile ? Visibility.Visible : Visibility.Collapsed;
+            ProfileNameText.Text = displayName;
+            UserText.Text = "Учетная запись: " + AccessPolicy.GetAccountTitle(_currentLogin, _role) +
+                "\nРоль: " + AccessPolicy.GetRoleTitle(_role) +
+                "\nРежим: " + _database.ModeTitle +
+                "\nХранилище: " + _database.StorageLabel;
+        }
+
+        private static List<NavigationItem> BuildNavigationItems(UserRole role)
+        {
+            List<NavigationItem> items = new List<NavigationItem>();
+
+            if (AccessPolicy.CanAccessBracket(role))
+            {
+                items.Add(NavigationItem.ForBracket());
+            }
+
+            items.AddRange(EntityRegistry.All
+                .Where(definition => AccessPolicy.CanAccessEntity(role, definition.TableName))
+                .Select(NavigationItem.ForEntity));
             return items;
         }
     }

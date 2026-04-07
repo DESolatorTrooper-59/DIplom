@@ -7,7 +7,7 @@ namespace Tournaments.WPF.Services
         private static EntityDefinition CreateTeamsDefinition()
         {
             EntityDefinition definition = new EntityDefinition(
-                "Teams",
+                "Команды",
                 "Команды",
                 new[] { "TeamID" },
                 new[]
@@ -24,7 +24,7 @@ namespace Tournaments.WPF.Services
             {
                 string teamName = GetString(context.Values, "TeamName");
                 int currentId = GetOriginalInt(context, "TeamID");
-                if (IsDuplicate(context.Database, "Teams", "TeamName", teamName, "TeamID", currentId, context.IsInsert))
+                if (IsDuplicate(context.Database, "Команды", "TeamName", teamName, "TeamID", currentId, context.IsInsert))
                 {
                     return EntityValidationResult.Fail("Команда с таким названием уже существует.");
                 }
@@ -175,3 +175,4 @@ namespace Tournaments.WPF.Services
         }
     }
 }
+

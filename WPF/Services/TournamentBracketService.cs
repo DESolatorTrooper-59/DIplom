@@ -1147,14 +1147,16 @@ namespace Tournaments.WPF.Services
             {
                 case "scheduled":
                     return "Запланирован";
-                case "in progress":
-                case "inprogress":
-                    return "Идет";
                 case "completed":
                     return "Завершен";
                 case "auto advanced":
                 case "autoadvanced":
                     return "Автопроход";
+                case "live":
+                case "cancelled":
+                case "in progress":
+                case "inprogress":
+                    return "Запланирован";
                 default:
                     return string.IsNullOrWhiteSpace(value) ? "Без статуса" : value;
             }
@@ -1167,9 +1169,6 @@ namespace Tournaments.WPF.Services
             {
                 case "completed":
                     return "Completed";
-                case "in progress":
-                case "inprogress":
-                    return "In Progress";
                 case "auto advanced":
                 case "autoadvanced":
                     return "Auto Advanced";
