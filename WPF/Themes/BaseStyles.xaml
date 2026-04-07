@@ -109,7 +109,7 @@
     <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource ControlForegroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ComboBoxDisplayForegroundBrush}" />
   </Style>
 
   <Style TargetType="ListBox">
@@ -127,7 +127,7 @@
       </Trigger>
       <Trigger Property="IsSelected" Value="True">
         <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-        <Setter Property="Foreground" Value="{DynamicResource PrimaryButtonForegroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource ComboBoxSelectionForegroundBrush}" />
       </Trigger>
     </Style.Triggers>
   </Style>
@@ -137,7 +137,7 @@
     <Setter Property="Padding" Value="8,4" />
     <Setter Property="MinHeight" Value="28" />
     <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
-    <Setter Property="Foreground" Value="{DynamicResource ControlForegroundBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource ComboBoxDisplayForegroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource ControlBorderBrush}" />
   </Style>
 
