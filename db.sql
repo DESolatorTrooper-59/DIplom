@@ -15,7 +15,23 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- Скрипт разворачивает dev/demo-базу данных для проекта.
--- Демо-учётная запись: admin / password
+-- Физическая схема использует русские имена таблиц и столбцов.
+-- Для совместимости со старым кодом ниже создаются английские VIEW-алиасы.
+-- Демо-учётная запись администратора: admin / password
+
+IF OBJECT_ID(N'[dbo].[Organizer]', N'V') IS NOT NULL DROP VIEW [dbo].[Organizer];
+IF OBJECT_ID(N'[dbo].[GameTitles]', N'V') IS NOT NULL DROP VIEW [dbo].[GameTitles];
+IF OBJECT_ID(N'[dbo].[Teams]', N'V') IS NOT NULL DROP VIEW [dbo].[Teams];
+IF OBJECT_ID(N'[dbo].[Players]', N'V') IS NOT NULL DROP VIEW [dbo].[Players];
+IF OBJECT_ID(N'[dbo].[Sponsors]', N'V') IS NOT NULL DROP VIEW [dbo].[Sponsors];
+IF OBJECT_ID(N'[dbo].[Tournaments]', N'V') IS NOT NULL DROP VIEW [dbo].[Tournaments];
+IF OBJECT_ID(N'[dbo].[TournamentStages]', N'V') IS NOT NULL DROP VIEW [dbo].[TournamentStages];
+IF OBJECT_ID(N'[dbo].[TeamPlayers]', N'V') IS NOT NULL DROP VIEW [dbo].[TeamPlayers];
+IF OBJECT_ID(N'[dbo].[TournamentParticipants]', N'V') IS NOT NULL DROP VIEW [dbo].[TournamentParticipants];
+IF OBJECT_ID(N'[dbo].[Matches]', N'V') IS NOT NULL DROP VIEW [dbo].[Matches];
+IF OBJECT_ID(N'[dbo].[Streams]', N'V') IS NOT NULL DROP VIEW [dbo].[Streams];
+IF OBJECT_ID(N'[dbo].[TournamentSponsors]', N'V') IS NOT NULL DROP VIEW [dbo].[TournamentSponsors];
+GO
 
 DROP TABLE IF EXISTS [dbo].[Streams];
 DROP TABLE IF EXISTS [dbo].[Matches];
@@ -31,254 +47,268 @@ DROP TABLE IF EXISTS [dbo].[GameTitles];
 DROP TABLE IF EXISTS [dbo].[Organizer];
 GO
 
-CREATE TABLE [dbo].[Organizer]
+DROP TABLE IF EXISTS [dbo].[Трансляции];
+DROP TABLE IF EXISTS [dbo].[Матчи];
+DROP TABLE IF EXISTS [dbo].[СпонсорыТурниров];
+DROP TABLE IF EXISTS [dbo].[УчастникиТурниров];
+DROP TABLE IF EXISTS [dbo].[СоставыКоманд];
+DROP TABLE IF EXISTS [dbo].[ЭтапыТурниров];
+DROP TABLE IF EXISTS [dbo].[Турниры];
+DROP TABLE IF EXISTS [dbo].[Спонсоры];
+DROP TABLE IF EXISTS [dbo].[Игроки];
+DROP TABLE IF EXISTS [dbo].[Команды];
+DROP TABLE IF EXISTS [dbo].[Игры];
+DROP TABLE IF EXISTS [dbo].[Организаторы];
+GO
+
+CREATE TABLE [dbo].[Организаторы]
 (
-    [Login] NVARCHAR(50) NOT NULL,
-    [Password] NVARCHAR(50) NOT NULL,
-    CONSTRAINT [PK_Organizer] PRIMARY KEY CLUSTERED ([Login] ASC)
+    [Логин] NVARCHAR(50) NOT NULL,
+    [Пароль] NVARCHAR(50) NOT NULL,
+    CONSTRAINT [PK_Organizer] PRIMARY KEY CLUSTERED ([Логин] ASC)
 );
 GO
 
-CREATE TABLE [dbo].[GameTitles]
+CREATE TABLE [dbo].[Игры]
 (
-    [GameID] INT IDENTITY(1,1) NOT NULL,
-    [GameName] NVARCHAR(100) NOT NULL,
-    [Developer] NVARCHAR(100) NOT NULL,
-    [ReleaseYear] INT NOT NULL,
-    [MaxPlayersPerTeam] INT NOT NULL
+    [IDИгры] INT IDENTITY(1,1) NOT NULL,
+    [НазваниеИгры] NVARCHAR(100) NOT NULL,
+    [Разработчик] NVARCHAR(100) NOT NULL,
+    [ГодВыпуска] INT NOT NULL,
+    [МаксИгроковВКоманде] INT NOT NULL
         CONSTRAINT [DF_GameTitles_MaxPlayersPerTeam] DEFAULT (5),
-    CONSTRAINT [PK_GameTitles] PRIMARY KEY CLUSTERED ([GameID] ASC),
-    CONSTRAINT [UQ_GameTitles_GameName] UNIQUE ([GameName]),
-    CONSTRAINT [CHK_GameTitles_ReleaseYear] CHECK ([ReleaseYear] >= 1970),
-    CONSTRAINT [CHK_GameTitles_MaxPlayersPerTeam] CHECK ([MaxPlayersPerTeam] > 0)
+    CONSTRAINT [PK_GameTitles] PRIMARY KEY CLUSTERED ([IDИгры] ASC),
+    CONSTRAINT [UQ_GameTitles_GameName] UNIQUE ([НазваниеИгры]),
+    CONSTRAINT [CHK_GameTitles_ReleaseYear] CHECK ([ГодВыпуска] >= 1970),
+    CONSTRAINT [CHK_GameTitles_MaxPlayersPerTeam] CHECK ([МаксИгроковВКоманде] > 0)
 );
 GO
 
-CREATE TABLE [dbo].[Teams]
+CREATE TABLE [dbo].[Команды]
 (
-    [TeamID] INT IDENTITY(1,1) NOT NULL,
-    [TeamName] NVARCHAR(100) NOT NULL,
-    [FoundedDate] DATE NOT NULL,
-    [Country] NVARCHAR(50) NOT NULL,
-    [CoachName] NVARCHAR(150) NOT NULL,
-    [CreatedDate] DATETIME2(0) NOT NULL
+    [IDКоманды] INT IDENTITY(1,1) NOT NULL,
+    [НазваниеКоманды] NVARCHAR(100) NOT NULL,
+    [ДатаОснования] DATE NOT NULL,
+    [Страна] NVARCHAR(50) NOT NULL,
+    [ИмяТренера] NVARCHAR(150) NOT NULL,
+    [ДатаСоздания] DATETIME2(0) NOT NULL
         CONSTRAINT [DF_Teams_CreatedDate] DEFAULT (SYSDATETIME()),
-    CONSTRAINT [PK_Teams] PRIMARY KEY CLUSTERED ([TeamID] ASC),
-    CONSTRAINT [UQ_Teams_TeamName] UNIQUE ([TeamName])
+    CONSTRAINT [PK_Teams] PRIMARY KEY CLUSTERED ([IDКоманды] ASC),
+    CONSTRAINT [UQ_Teams_TeamName] UNIQUE ([НазваниеКоманды])
 );
 GO
 
-CREATE TABLE [dbo].[Players]
+CREATE TABLE [dbo].[Игроки]
 (
-    [PlayerID] INT IDENTITY(1,1) NOT NULL,
-    [Nickname] NVARCHAR(100) NOT NULL,
-    [RealName] NVARCHAR(150) NOT NULL,
-    [Country] NVARCHAR(50) NOT NULL,
-    [BirthDate] DATE NOT NULL,
-    [Password] NVARCHAR(50) NULL,
-    CONSTRAINT [PK_Players] PRIMARY KEY CLUSTERED ([PlayerID] ASC),
-    CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Nickname])
+    [IDИгрока] INT IDENTITY(1,1) NOT NULL,
+    [Никнейм] NVARCHAR(100) NOT NULL,
+    [НастоящееИмя] NVARCHAR(150) NOT NULL,
+    [Страна] NVARCHAR(50) NOT NULL,
+    [ДатаРождения] DATE NOT NULL,
+    [Пароль] NVARCHAR(50) NULL,
+    CONSTRAINT [PK_Players] PRIMARY KEY CLUSTERED ([IDИгрока] ASC),
+    CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Никнейм])
 );
 GO
 
-CREATE TABLE [dbo].[Sponsors]
+CREATE TABLE [dbo].[Спонсоры]
 (
-    [SponsorID] INT IDENTITY(1,1) NOT NULL,
-    [SponsorName] NVARCHAR(150) NOT NULL,
-    [Industry] NVARCHAR(100) NOT NULL,
-    CONSTRAINT [PK_Sponsors] PRIMARY KEY CLUSTERED ([SponsorID] ASC),
-    CONSTRAINT [UQ_Sponsors_SponsorName] UNIQUE ([SponsorName])
+    [IDСпонсора] INT IDENTITY(1,1) NOT NULL,
+    [НазваниеСпонсора] NVARCHAR(150) NOT NULL,
+    [Индустрия] NVARCHAR(100) NOT NULL,
+    CONSTRAINT [PK_Sponsors] PRIMARY KEY CLUSTERED ([IDСпонсора] ASC),
+    CONSTRAINT [UQ_Sponsors_SponsorName] UNIQUE ([НазваниеСпонсора])
 );
 GO
 
-CREATE TABLE [dbo].[Tournaments]
+CREATE TABLE [dbo].[Турниры]
 (
-    [TournamentID] INT IDENTITY(1,1) NOT NULL,
-    [TournamentName] NVARCHAR(200) NOT NULL,
-    [GameID] INT NOT NULL,
-    [StartDate] DATE NOT NULL,
-    [EndDate] DATE NULL,
-    [PrizePool] DECIMAL(15,2) NULL,
-    [Organizer] NVARCHAR(150) NULL,
-    [Location] NVARCHAR(200) NULL,
-    [FormatType] NVARCHAR(50) NOT NULL,
-    [MaxTeams] INT NOT NULL,
-    [ParticipantMode] NVARCHAR(20) NOT NULL
+    [IDТурнира] INT IDENTITY(1,1) NOT NULL,
+    [НазваниеТурнира] NVARCHAR(200) NOT NULL,
+    [IDИгры] INT NOT NULL,
+    [ДатаНачала] DATE NOT NULL,
+    [ДатаОкончания] DATE NULL,
+    [ПризовойФонд] DECIMAL(15,2) NULL,
+    [Организатор] NVARCHAR(150) NULL,
+    [МестоПроведения] NVARCHAR(200) NULL,
+    [ТипФормата] NVARCHAR(50) NOT NULL,
+    [МаксУчастников] INT NOT NULL,
+    [ТипУчастников] NVARCHAR(20) NOT NULL
         CONSTRAINT [DF_Tournaments_ParticipantMode] DEFAULT (N'Команды'),
-    CONSTRAINT [PK_Tournaments] PRIMARY KEY CLUSTERED ([TournamentID] ASC),
-    CONSTRAINT [FK_Tournaments_GameTitles] FOREIGN KEY ([GameID])
-        REFERENCES [dbo].[GameTitles] ([GameID]),
-    CONSTRAINT [CHK_Tournaments_MaxTeams] CHECK ([MaxTeams] > 1),
-    CONSTRAINT [CHK_Tournaments_Dates] CHECK ([EndDate] IS NULL OR [EndDate] >= [StartDate]),
-    CONSTRAINT [CHK_Tournaments_FormatType] CHECK ([FormatType] IN (N'Single Elimination', N'Double Elimination', N'League')),
-    CONSTRAINT [CHK_Tournaments_ParticipantMode] CHECK ([ParticipantMode] IN (N'Команды', N'Игроки'))
+    CONSTRAINT [PK_Tournaments] PRIMARY KEY CLUSTERED ([IDТурнира] ASC),
+    CONSTRAINT [FK_Tournaments_GameTitles] FOREIGN KEY ([IDИгры])
+        REFERENCES [dbo].[Игры] ([IDИгры]),
+    CONSTRAINT [CHK_Tournaments_MaxTeams] CHECK ([МаксУчастников] > 1),
+    CONSTRAINT [CHK_Tournaments_Dates] CHECK ([ДатаОкончания] IS NULL OR [ДатаОкончания] >= [ДатаНачала]),
+    CONSTRAINT [CHK_Tournaments_FormatType] CHECK ([ТипФормата] IN (N'Single Elimination', N'Double Elimination', N'League')),
+    CONSTRAINT [CHK_Tournaments_ParticipantMode] CHECK ([ТипУчастников] IN (N'Команды', N'Игроки'))
 );
 GO
 
-CREATE TABLE [dbo].[TournamentStages]
+CREATE TABLE [dbo].[ЭтапыТурниров]
 (
-    [StageID] INT IDENTITY(1,1) NOT NULL,
-    [TournamentID] INT NOT NULL,
-    [StageName] NVARCHAR(100) NOT NULL,
-    [StageOrder] INT NOT NULL,
-    [BracketType] NVARCHAR(20) NULL,
-    CONSTRAINT [PK_TournamentStages] PRIMARY KEY CLUSTERED ([StageID] ASC),
-    CONSTRAINT [FK_TournamentStages_Tournaments] FOREIGN KEY ([TournamentID])
-        REFERENCES [dbo].[Tournaments] ([TournamentID]),
-    CONSTRAINT [UQ_TournamentStages_Tournament_StageOrder] UNIQUE ([TournamentID], [StageOrder]),
-    CONSTRAINT [CHK_TournamentStages_BracketType] CHECK ([BracketType] IS NULL OR [BracketType] IN (N'Winner', N'Loser', N'Final'))
+    [IDЭтапа] INT IDENTITY(1,1) NOT NULL,
+    [IDТурнира] INT NOT NULL,
+    [НазваниеЭтапа] NVARCHAR(100) NOT NULL,
+    [ПорядокЭтапа] INT NOT NULL,
+    [ТипСетки] NVARCHAR(20) NULL,
+    CONSTRAINT [PK_TournamentStages] PRIMARY KEY CLUSTERED ([IDЭтапа] ASC),
+    CONSTRAINT [FK_TournamentStages_Tournaments] FOREIGN KEY ([IDТурнира])
+        REFERENCES [dbo].[Турниры] ([IDТурнира]),
+    CONSTRAINT [UQ_TournamentStages_Tournament_StageOrder] UNIQUE ([IDТурнира], [ПорядокЭтапа]),
+    CONSTRAINT [CHK_TournamentStages_BracketType] CHECK ([ТипСетки] IS NULL OR [ТипСетки] IN (N'Winner', N'Loser', N'Final'))
 );
 GO
 
-CREATE TABLE [dbo].[TeamPlayers]
+CREATE TABLE [dbo].[СоставыКоманд]
 (
-    [TeamPlayerID] INT IDENTITY(1,1) NOT NULL,
-    [TeamID] INT NOT NULL,
-    [PlayerID] INT NOT NULL,
-    [JoinDate] DATE NOT NULL,
-    [LeaveDate] DATE NULL,
-    [IsActive] BIT NOT NULL
+    [IDСоставаКоманды] INT IDENTITY(1,1) NOT NULL,
+    [IDКоманды] INT NOT NULL,
+    [IDИгрока] INT NOT NULL,
+    [ДатаПрисоединения] DATE NOT NULL,
+    [ДатаУхода] DATE NULL,
+    [Активен] BIT NOT NULL
         CONSTRAINT [DF_TeamPlayers_IsActive] DEFAULT ((1)),
-    [Role] NVARCHAR(50) NULL,
-    CONSTRAINT [PK_TeamPlayers] PRIMARY KEY CLUSTERED ([TeamPlayerID] ASC),
-    CONSTRAINT [FK_TeamPlayers_Teams] FOREIGN KEY ([TeamID])
-        REFERENCES [dbo].[Teams] ([TeamID]),
-    CONSTRAINT [FK_TeamPlayers_Players] FOREIGN KEY ([PlayerID])
-        REFERENCES [dbo].[Players] ([PlayerID]),
-    CONSTRAINT [CHK_TeamPlayers_LeaveDate] CHECK ([LeaveDate] IS NULL OR [LeaveDate] > [JoinDate])
+    [Роль] NVARCHAR(50) NULL,
+    CONSTRAINT [PK_TeamPlayers] PRIMARY KEY CLUSTERED ([IDСоставаКоманды] ASC),
+    CONSTRAINT [FK_TeamPlayers_Teams] FOREIGN KEY ([IDКоманды])
+        REFERENCES [dbo].[Команды] ([IDКоманды]),
+    CONSTRAINT [FK_TeamPlayers_Players] FOREIGN KEY ([IDИгрока])
+        REFERENCES [dbo].[Игроки] ([IDИгрока]),
+    CONSTRAINT [CHK_TeamPlayers_LeaveDate] CHECK ([ДатаУхода] IS NULL OR [ДатаУхода] > [ДатаПрисоединения])
 );
 GO
 
 CREATE UNIQUE INDEX [UX_TeamPlayers_ActivePair]
-ON [dbo].[TeamPlayers] ([TeamID], [PlayerID])
-WHERE [IsActive] = 1;
+ON [dbo].[СоставыКоманд] ([IDКоманды], [IDИгрока])
+WHERE [Активен] = 1;
 GO
 
-CREATE TABLE [dbo].[TournamentParticipants]
+CREATE TABLE [dbo].[УчастникиТурниров]
 (
-    [ParticipationID] INT IDENTITY(1,1) NOT NULL,
-    [TournamentID] INT NOT NULL,
-    [TeamID] INT NULL,
-    [PlayerID] INT NULL,
-    [Seed] INT NULL,
-    [FinalPlace] INT NULL,
-    CONSTRAINT [PK_TournamentParticipants] PRIMARY KEY CLUSTERED ([ParticipationID] ASC),
-    CONSTRAINT [FK_TournamentParticipants_Tournaments] FOREIGN KEY ([TournamentID])
-        REFERENCES [dbo].[Tournaments] ([TournamentID]),
-    CONSTRAINT [FK_TournamentParticipants_Teams] FOREIGN KEY ([TeamID])
-        REFERENCES [dbo].[Teams] ([TeamID]),
-    CONSTRAINT [FK_TournamentParticipants_Players] FOREIGN KEY ([PlayerID])
-        REFERENCES [dbo].[Players] ([PlayerID]),
+    [IDУчастия] INT IDENTITY(1,1) NOT NULL,
+    [IDТурнира] INT NOT NULL,
+    [IDКоманды] INT NULL,
+    [IDИгрока] INT NULL,
+    [Посев] INT NULL,
+    [ИтоговоеМесто] INT NULL,
+    CONSTRAINT [PK_TournamentParticipants] PRIMARY KEY CLUSTERED ([IDУчастия] ASC),
+    CONSTRAINT [FK_TournamentParticipants_Tournaments] FOREIGN KEY ([IDТурнира])
+        REFERENCES [dbo].[Турниры] ([IDТурнира]),
+    CONSTRAINT [FK_TournamentParticipants_Teams] FOREIGN KEY ([IDКоманды])
+        REFERENCES [dbo].[Команды] ([IDКоманды]),
+    CONSTRAINT [FK_TournamentParticipants_Players] FOREIGN KEY ([IDИгрока])
+        REFERENCES [dbo].[Игроки] ([IDИгрока]),
     CONSTRAINT [CHK_TournamentParticipants_SingleEntity] CHECK
     (
-        ([TeamID] IS NOT NULL AND [PlayerID] IS NULL) OR
-        ([TeamID] IS NULL AND [PlayerID] IS NOT NULL)
+        ([IDКоманды] IS NOT NULL AND [IDИгрока] IS NULL) OR
+        ([IDКоманды] IS NULL AND [IDИгрока] IS NOT NULL)
     ),
-    CONSTRAINT [CHK_TournamentParticipants_Seed] CHECK ([Seed] IS NULL OR [Seed] > 0),
-    CONSTRAINT [CHK_TournamentParticipants_FinalPlace] CHECK ([FinalPlace] IS NULL OR [FinalPlace] > 0)
+    CONSTRAINT [CHK_TournamentParticipants_Seed] CHECK ([Посев] IS NULL OR [Посев] > 0),
+    CONSTRAINT [CHK_TournamentParticipants_FinalPlace] CHECK ([ИтоговоеМесто] IS NULL OR [ИтоговоеМесто] > 0)
 );
 GO
 
 CREATE UNIQUE INDEX [UX_TournamentParticipants_TournamentTeam]
-ON [dbo].[TournamentParticipants] ([TournamentID], [TeamID])
-WHERE [TeamID] IS NOT NULL;
+ON [dbo].[УчастникиТурниров] ([IDТурнира], [IDКоманды])
+WHERE [IDКоманды] IS NOT NULL;
 GO
 
 CREATE UNIQUE INDEX [UX_TournamentParticipants_TournamentPlayer]
-ON [dbo].[TournamentParticipants] ([TournamentID], [PlayerID])
-WHERE [PlayerID] IS NOT NULL;
+ON [dbo].[УчастникиТурниров] ([IDТурнира], [IDИгрока])
+WHERE [IDИгрока] IS NOT NULL;
 GO
 
-CREATE TABLE [dbo].[Matches]
+CREATE TABLE [dbo].[Матчи]
 (
-    [MatchID] INT IDENTITY(1,1) NOT NULL,
-    [TournamentID] INT NOT NULL,
-    [StageID] INT NOT NULL,
-    [MatchNumber] INT NOT NULL,
-    [Team1ID] INT NULL,
-    [Team2ID] INT NULL,
-    [WinnerTeamID] INT NULL,
-    [Player1ID] INT NULL,
-    [Player2ID] INT NULL,
-    [WinnerPlayerID] INT NULL,
-    [Team1Score] INT NOT NULL
+    [IDМатча] INT IDENTITY(1,1) NOT NULL,
+    [IDТурнира] INT NOT NULL,
+    [IDЭтапа] INT NOT NULL,
+    [НомерМатча] INT NOT NULL,
+    [IDКоманды1] INT NULL,
+    [IDКоманды2] INT NULL,
+    [IDПобедившейКоманды] INT NULL,
+    [IDИгрока1] INT NULL,
+    [IDИгрока2] INT NULL,
+    [IDПобедившегоИгрока] INT NULL,
+    [СчетКоманды1] INT NOT NULL
         CONSTRAINT [DF_Matches_Team1Score] DEFAULT ((0)),
-    [Team2Score] INT NOT NULL
+    [СчетКоманды2] INT NOT NULL
         CONSTRAINT [DF_Matches_Team2Score] DEFAULT ((0)),
-    [MatchDate] NVARCHAR(50) NULL,
-    [BestOf] INT NOT NULL
+    [ДатаМатча] NVARCHAR(50) NULL,
+    [ДоСколькихПобед] INT NOT NULL
         CONSTRAINT [DF_Matches_BestOf] DEFAULT ((3)),
-    [Status] NVARCHAR(20) NOT NULL
+    [Статус] NVARCHAR(20) NOT NULL
         CONSTRAINT [DF_Matches_Status] DEFAULT (N'Scheduled'),
-    CONSTRAINT [PK_Matches] PRIMARY KEY CLUSTERED ([MatchID] ASC),
-    CONSTRAINT [FK_Matches_Tournaments] FOREIGN KEY ([TournamentID])
-        REFERENCES [dbo].[Tournaments] ([TournamentID]),
-    CONSTRAINT [FK_Matches_TournamentStages] FOREIGN KEY ([StageID])
-        REFERENCES [dbo].[TournamentStages] ([StageID]),
-    CONSTRAINT [FK_Matches_Team1] FOREIGN KEY ([Team1ID])
-        REFERENCES [dbo].[Teams] ([TeamID]),
-    CONSTRAINT [FK_Matches_Team2] FOREIGN KEY ([Team2ID])
-        REFERENCES [dbo].[Teams] ([TeamID]),
-    CONSTRAINT [FK_Matches_WinnerTeam] FOREIGN KEY ([WinnerTeamID])
-        REFERENCES [dbo].[Teams] ([TeamID]),
-    CONSTRAINT [FK_Matches_Player1] FOREIGN KEY ([Player1ID])
-        REFERENCES [dbo].[Players] ([PlayerID]),
-    CONSTRAINT [FK_Matches_Player2] FOREIGN KEY ([Player2ID])
-        REFERENCES [dbo].[Players] ([PlayerID]),
-    CONSTRAINT [FK_Matches_WinnerPlayer] FOREIGN KEY ([WinnerPlayerID])
-        REFERENCES [dbo].[Players] ([PlayerID]),
-    CONSTRAINT [UQ_Matches_Tournament_MatchNumber] UNIQUE ([TournamentID], [MatchNumber]),
-    CONSTRAINT [CHK_Matches_Status] CHECK ([Status] IN (N'Scheduled', N'Completed')),
-    CONSTRAINT [CHK_Matches_Teams] CHECK ([Team1ID] IS NULL OR [Team2ID] IS NULL OR [Team1ID] <> [Team2ID]),
-    CONSTRAINT [CHK_Matches_Players] CHECK ([Player1ID] IS NULL OR [Player2ID] IS NULL OR [Player1ID] <> [Player2ID]),
-    CONSTRAINT [CHK_Matches_Winner] CHECK ([WinnerTeamID] IS NULL OR [WinnerTeamID] = [Team1ID] OR [WinnerTeamID] = [Team2ID]),
-    CONSTRAINT [CHK_Matches_WinnerPlayer] CHECK ([WinnerPlayerID] IS NULL OR [WinnerPlayerID] = [Player1ID] OR [WinnerPlayerID] = [Player2ID]),
+    CONSTRAINT [PK_Matches] PRIMARY KEY CLUSTERED ([IDМатча] ASC),
+    CONSTRAINT [FK_Matches_Tournaments] FOREIGN KEY ([IDТурнира])
+        REFERENCES [dbo].[Турниры] ([IDТурнира]),
+    CONSTRAINT [FK_Matches_TournamentStages] FOREIGN KEY ([IDЭтапа])
+        REFERENCES [dbo].[ЭтапыТурниров] ([IDЭтапа]),
+    CONSTRAINT [FK_Matches_Team1] FOREIGN KEY ([IDКоманды1])
+        REFERENCES [dbo].[Команды] ([IDКоманды]),
+    CONSTRAINT [FK_Matches_Team2] FOREIGN KEY ([IDКоманды2])
+        REFERENCES [dbo].[Команды] ([IDКоманды]),
+    CONSTRAINT [FK_Matches_WinnerTeam] FOREIGN KEY ([IDПобедившейКоманды])
+        REFERENCES [dbo].[Команды] ([IDКоманды]),
+    CONSTRAINT [FK_Matches_Player1] FOREIGN KEY ([IDИгрока1])
+        REFERENCES [dbo].[Игроки] ([IDИгрока]),
+    CONSTRAINT [FK_Matches_Player2] FOREIGN KEY ([IDИгрока2])
+        REFERENCES [dbo].[Игроки] ([IDИгрока]),
+    CONSTRAINT [FK_Matches_WinnerPlayer] FOREIGN KEY ([IDПобедившегоИгрока])
+        REFERENCES [dbo].[Игроки] ([IDИгрока]),
+    CONSTRAINT [UQ_Matches_Tournament_MatchNumber] UNIQUE ([IDТурнира], [НомерМатча]),
+    CONSTRAINT [CHK_Matches_Status] CHECK ([Статус] IN (N'Scheduled', N'Completed')),
+    CONSTRAINT [CHK_Matches_Teams] CHECK ([IDКоманды1] IS NULL OR [IDКоманды2] IS NULL OR [IDКоманды1] <> [IDКоманды2]),
+    CONSTRAINT [CHK_Matches_Players] CHECK ([IDИгрока1] IS NULL OR [IDИгрока2] IS NULL OR [IDИгрока1] <> [IDИгрока2]),
+    CONSTRAINT [CHK_Matches_Winner] CHECK ([IDПобедившейКоманды] IS NULL OR [IDПобедившейКоманды] = [IDКоманды1] OR [IDПобедившейКоманды] = [IDКоманды2]),
+    CONSTRAINT [CHK_Matches_WinnerPlayer] CHECK ([IDПобедившегоИгрока] IS NULL OR [IDПобедившегоИгрока] = [IDИгрока1] OR [IDПобедившегоИгрока] = [IDИгрока2]),
     CONSTRAINT [CHK_Matches_ParticipantSource] CHECK
     (
-        ([Player1ID] IS NULL AND [Player2ID] IS NULL AND [WinnerPlayerID] IS NULL) OR
-        ([Team1ID] IS NULL AND [Team2ID] IS NULL AND [WinnerTeamID] IS NULL)
+        ([IDИгрока1] IS NULL AND [IDИгрока2] IS NULL AND [IDПобедившегоИгрока] IS NULL) OR
+        ([IDКоманды1] IS NULL AND [IDКоманды2] IS NULL AND [IDПобедившейКоманды] IS NULL)
     ),
-    CONSTRAINT [CHK_Matches_Score1] CHECK ([Team1Score] >= 0),
-    CONSTRAINT [CHK_Matches_Score2] CHECK ([Team2Score] >= 0),
-    CONSTRAINT [CHK_Matches_BestOf] CHECK ([BestOf] > 0 AND [BestOf] % 2 = 1)
+    CONSTRAINT [CHK_Matches_Score1] CHECK ([СчетКоманды1] >= 0),
+    CONSTRAINT [CHK_Matches_Score2] CHECK ([СчетКоманды2] >= 0),
+    CONSTRAINT [CHK_Matches_BestOf] CHECK ([ДоСколькихПобед] > 0 AND [ДоСколькихПобед] % 2 = 1)
 );
 GO
 
-CREATE TABLE [dbo].[Streams]
+CREATE TABLE [dbo].[Трансляции]
 (
-    [StreamID] INT IDENTITY(1,1) NOT NULL,
-    [TournamentID] INT NOT NULL,
-    [MatchID] INT NULL,
-    [Platform] NVARCHAR(50) NULL,
-    [StreamURL] NVARCHAR(500) NULL,
-    CONSTRAINT [PK_Streams] PRIMARY KEY CLUSTERED ([StreamID] ASC),
-    CONSTRAINT [FK_Streams_Tournaments] FOREIGN KEY ([TournamentID])
-        REFERENCES [dbo].[Tournaments] ([TournamentID]),
-    CONSTRAINT [FK_Streams_Matches] FOREIGN KEY ([MatchID])
-        REFERENCES [dbo].[Matches] ([MatchID])
+    [IDТрансляции] INT IDENTITY(1,1) NOT NULL,
+    [IDТурнира] INT NOT NULL,
+    [IDМатча] INT NULL,
+    [Платформа] NVARCHAR(50) NULL,
+    [СсылкаТрансляции] NVARCHAR(500) NULL,
+    CONSTRAINT [PK_Streams] PRIMARY KEY CLUSTERED ([IDТрансляции] ASC),
+    CONSTRAINT [FK_Streams_Tournaments] FOREIGN KEY ([IDТурнира])
+        REFERENCES [dbo].[Турниры] ([IDТурнира]),
+    CONSTRAINT [FK_Streams_Matches] FOREIGN KEY ([IDМатча])
+        REFERENCES [dbo].[Матчи] ([IDМатча])
 );
 GO
 
-CREATE TABLE [dbo].[TournamentSponsors]
+CREATE TABLE [dbo].[СпонсорыТурниров]
 (
-    [TournamentID] INT NOT NULL,
-    [SponsorID] INT NOT NULL,
-    [SponsorshipAmount] DECIMAL(15,2) NULL,
-    [Currency] NVARCHAR(10) NOT NULL
+    [IDТурнира] INT NOT NULL,
+    [IDСпонсора] INT NOT NULL,
+    [СуммаСпонсорства] DECIMAL(15,2) NULL,
+    [Валюта] NVARCHAR(10) NOT NULL
         CONSTRAINT [DF_TournamentSponsors_Currency] DEFAULT (N'USD'),
-    CONSTRAINT [PK_TournamentSponsors] PRIMARY KEY CLUSTERED ([TournamentID] ASC, [SponsorID] ASC),
-    CONSTRAINT [FK_TournamentSponsors_Tournaments] FOREIGN KEY ([TournamentID])
-        REFERENCES [dbo].[Tournaments] ([TournamentID]),
-    CONSTRAINT [FK_TournamentSponsors_Sponsors] FOREIGN KEY ([SponsorID])
-        REFERENCES [dbo].[Sponsors] ([SponsorID]),
-    CONSTRAINT [CHK_TournamentSponsors_Amount] CHECK ([SponsorshipAmount] IS NULL OR [SponsorshipAmount] >= 0)
+    CONSTRAINT [PK_TournamentSponsors] PRIMARY KEY CLUSTERED ([IDТурнира] ASC, [IDСпонсора] ASC),
+    CONSTRAINT [FK_TournamentSponsors_Tournaments] FOREIGN KEY ([IDТурнира])
+        REFERENCES [dbo].[Турниры] ([IDТурнира]),
+    CONSTRAINT [FK_TournamentSponsors_Sponsors] FOREIGN KEY ([IDСпонсора])
+        REFERENCES [dbo].[Спонсоры] ([IDСпонсора]),
+    CONSTRAINT [CHK_TournamentSponsors_Amount] CHECK ([СуммаСпонсорства] IS NULL OR [СуммаСпонсорства] >= 0)
 );
 GO
 
-INSERT INTO [dbo].[Organizer] ([Login], [Password])
+INSERT INTO [dbo].[Организаторы] ([Логин], [Пароль])
 VALUES (N'admin', N'password');
 
-INSERT INTO [dbo].[GameTitles] ([GameName], [Developer], [ReleaseYear], [MaxPlayersPerTeam])
+INSERT INTO [dbo].[Игры] ([НазваниеИгры], [Разработчик], [ГодВыпуска], [МаксИгроковВКоманде])
 VALUES
     (N'Counter-Strike 2', N'Valve', 2023, 5),
     (N'Tiberium Wars', N'EA LA', 2007, 4),
@@ -286,12 +316,12 @@ VALUES
     (N'Red Alert 2', N'Westwood Studios, EA Pacific', 2000, 4),
     (N'Red Alert 3', N'EA LA', 2008, 4);
 
-INSERT INTO [dbo].[Teams] ([TeamName], [FoundedDate], [Country], [CoachName])
+INSERT INTO [dbo].[Команды] ([НазваниеКоманды], [ДатаОснования], [Страна], [ИмяТренера])
 VALUES
     (N'NAVI', '2009-12-17', N'Ukraine', N'B1ad3'),
     (N'Team Spirit', '2015-12-05', N'Russia', N'hally');
 
-INSERT INTO [dbo].[Players] ([Nickname], [RealName], [Country], [BirthDate])
+INSERT INTO [dbo].[Игроки] ([Никнейм], [НастоящееИмя], [Страна], [ДатаРождения])
 VALUES
     (N's1mple', N'Oleksandr Kostyliev', N'Ukraine', '1997-10-02'),
     (N'donk', N'Danil Kryshkovets', N'Russia', '2007-01-25'),
@@ -304,21 +334,21 @@ VALUES
     (N'Rildcom', N'Скрыто', N'Australia', '2000-01-01'),
     (N'Svenson', N'Скрыто', N'Nigerlands', '2000-01-01');
 
-INSERT INTO [dbo].[Sponsors] ([SponsorName], [Industry])
+INSERT INTO [dbo].[Спонсоры] ([НазваниеСпонсора], [Индустрия])
 VALUES (N'Red Bull', N'Energy Drinks');
 
-INSERT INTO [dbo].[Tournaments]
+INSERT INTO [dbo].[Турниры]
 (
-    [TournamentName],
-    [GameID],
-    [StartDate],
-    [EndDate],
-    [PrizePool],
-    [Organizer],
-    [Location],
-    [FormatType],
-    [MaxTeams],
-    [ParticipantMode]
+    [НазваниеТурнира],
+    [IDИгры],
+    [ДатаНачала],
+    [ДатаОкончания],
+    [ПризовойФонд],
+    [Организатор],
+    [МестоПроведения],
+    [ТипФормата],
+    [МаксУчастников],
+    [ТипУчастников]
 )
 VALUES
 (
@@ -370,17 +400,17 @@ VALUES
     N'Игроки'
 );
 
-INSERT INTO [dbo].[TournamentStages] ([TournamentID], [StageName], [StageOrder], [BracketType])
+INSERT INTO [dbo].[ЭтапыТурниров] ([IDТурнира], [НазваниеЭтапа], [ПорядокЭтапа], [ТипСетки])
 VALUES (1, N'Playoffs', 1, N'Winner');
 
-INSERT INTO [dbo].[TeamPlayers] ([TeamID], [PlayerID], [JoinDate], [IsActive], [Role])
+INSERT INTO [dbo].[СоставыКоманд] ([IDКоманды], [IDИгрока], [ДатаПрисоединения], [Активен], [Роль])
 VALUES
     (1, 1, '2026-01-15', 1, N'AWPer'),
     (2, 2, '2026-01-20', 1, N'Star Player');
 
-SET IDENTITY_INSERT [dbo].[TournamentParticipants] ON;
+SET IDENTITY_INSERT [dbo].[УчастникиТурниров] ON;
 
-INSERT INTO [dbo].[TournamentParticipants] ([ParticipationID], [TournamentID], [TeamID], [PlayerID], [Seed], [FinalPlace])
+INSERT INTO [dbo].[УчастникиТурниров] ([IDУчастия], [IDТурнира], [IDКоманды], [IDИгрока], [Посев], [ИтоговоеМесто])
 VALUES
     (1, 1, 1, NULL, 1, NULL),
     (2, 1, 2, NULL, 2, NULL),
@@ -396,21 +426,21 @@ VALUES
     (14, 4, NULL, 5, 1, NULL),
     (15, 4, NULL, 3, 2, NULL);
 
-SET IDENTITY_INSERT [dbo].[TournamentParticipants] OFF;
+SET IDENTITY_INSERT [dbo].[УчастникиТурниров] OFF;
 
-INSERT INTO [dbo].[Matches]
+INSERT INTO [dbo].[Матчи]
 (
-    [TournamentID],
-    [StageID],
-    [MatchNumber],
-    [Team1ID],
-    [Team2ID],
-    [WinnerTeamID],
-    [Team1Score],
-    [Team2Score],
-    [MatchDate],
-    [BestOf],
-    [Status]
+    [IDТурнира],
+    [IDЭтапа],
+    [НомерМатча],
+    [IDКоманды1],
+    [IDКоманды2],
+    [IDПобедившейКоманды],
+    [СчетКоманды1],
+    [СчетКоманды2],
+    [ДатаМатча],
+    [ДоСколькихПобед],
+    [Статус]
 )
 VALUES
 (
@@ -427,9 +457,156 @@ VALUES
     N'Scheduled'
 );
 
-INSERT INTO [dbo].[Streams] ([TournamentID], [MatchID], [Platform], [StreamURL])
+INSERT INTO [dbo].[Трансляции] ([IDТурнира], [IDМатча], [Платформа], [СсылкаТрансляции])
 VALUES (1, 1, N'Twitch', N'https://twitch.tv/tournamentsdemo');
 
-INSERT INTO [dbo].[TournamentSponsors] ([TournamentID], [SponsorID], [SponsorshipAmount], [Currency])
+INSERT INTO [dbo].[СпонсорыТурниров] ([IDТурнира], [IDСпонсора], [СуммаСпонсорства], [Валюта])
 VALUES (1, 1, 50000.00, N'USD');
+GO
+
+CREATE VIEW [dbo].[Organizer]
+AS
+SELECT
+    [Логин] AS [Login],
+    [Пароль] AS [Password]
+FROM [dbo].[Организаторы];
+GO
+
+CREATE VIEW [dbo].[GameTitles]
+AS
+SELECT
+    [IDИгры] AS [GameID],
+    [НазваниеИгры] AS [GameName],
+    [Разработчик] AS [Developer],
+    [ГодВыпуска] AS [ReleaseYear],
+    [МаксИгроковВКоманде] AS [MaxPlayersPerTeam]
+FROM [dbo].[Игры];
+GO
+
+CREATE VIEW [dbo].[Teams]
+AS
+SELECT
+    [IDКоманды] AS [TeamID],
+    [НазваниеКоманды] AS [TeamName],
+    [ДатаОснования] AS [FoundedDate],
+    [Страна] AS [Country],
+    [ИмяТренера] AS [CoachName],
+    [ДатаСоздания] AS [CreatedDate]
+FROM [dbo].[Команды];
+GO
+
+CREATE VIEW [dbo].[Players]
+AS
+SELECT
+    [IDИгрока] AS [PlayerID],
+    [Никнейм] AS [Nickname],
+    [НастоящееИмя] AS [RealName],
+    [Страна] AS [Country],
+    [ДатаРождения] AS [BirthDate],
+    [Пароль] AS [Password]
+FROM [dbo].[Игроки];
+GO
+
+CREATE VIEW [dbo].[Sponsors]
+AS
+SELECT
+    [IDСпонсора] AS [SponsorID],
+    [НазваниеСпонсора] AS [SponsorName],
+    [Индустрия] AS [Industry]
+FROM [dbo].[Спонсоры];
+GO
+
+CREATE VIEW [dbo].[Tournaments]
+AS
+SELECT
+    [IDТурнира] AS [TournamentID],
+    [НазваниеТурнира] AS [TournamentName],
+    [IDИгры] AS [GameID],
+    [ДатаНачала] AS [StartDate],
+    [ДатаОкончания] AS [EndDate],
+    [ПризовойФонд] AS [PrizePool],
+    [Организатор] AS [Organizer],
+    [МестоПроведения] AS [Location],
+    [ТипФормата] AS [FormatType],
+    [МаксУчастников] AS [MaxTeams],
+    [ТипУчастников] AS [ParticipantMode]
+FROM [dbo].[Турниры];
+GO
+
+CREATE VIEW [dbo].[TournamentStages]
+AS
+SELECT
+    [IDЭтапа] AS [StageID],
+    [IDТурнира] AS [TournamentID],
+    [НазваниеЭтапа] AS [StageName],
+    [ПорядокЭтапа] AS [StageOrder],
+    [ТипСетки] AS [BracketType]
+FROM [dbo].[ЭтапыТурниров];
+GO
+
+CREATE VIEW [dbo].[TeamPlayers]
+AS
+SELECT
+    [IDСоставаКоманды] AS [TeamPlayerID],
+    [IDКоманды] AS [TeamID],
+    [IDИгрока] AS [PlayerID],
+    [ДатаПрисоединения] AS [JoinDate],
+    [ДатаУхода] AS [LeaveDate],
+    [Активен] AS [IsActive],
+    [Роль] AS [Role]
+FROM [dbo].[СоставыКоманд];
+GO
+
+CREATE VIEW [dbo].[TournamentParticipants]
+AS
+SELECT
+    [IDУчастия] AS [ParticipationID],
+    [IDТурнира] AS [TournamentID],
+    [IDКоманды] AS [TeamID],
+    [IDИгрока] AS [PlayerID],
+    [Посев] AS [Seed],
+    [ИтоговоеМесто] AS [FinalPlace]
+FROM [dbo].[УчастникиТурниров];
+GO
+
+CREATE VIEW [dbo].[Matches]
+AS
+SELECT
+    [IDМатча] AS [MatchID],
+    [IDТурнира] AS [TournamentID],
+    [IDЭтапа] AS [StageID],
+    [НомерМатча] AS [MatchNumber],
+    [IDКоманды1] AS [Team1ID],
+    [IDКоманды2] AS [Team2ID],
+    [IDПобедившейКоманды] AS [WinnerTeamID],
+    [IDИгрока1] AS [Player1ID],
+    [IDИгрока2] AS [Player2ID],
+    [IDПобедившегоИгрока] AS [WinnerPlayerID],
+    [СчетКоманды1] AS [Team1Score],
+    [СчетКоманды2] AS [Team2Score],
+    [ДатаМатча] AS [MatchDate],
+    [ДоСколькихПобед] AS [BestOf],
+    [Статус] AS [Status]
+FROM [dbo].[Матчи];
+GO
+
+CREATE VIEW [dbo].[Streams]
+AS
+SELECT
+    [IDТрансляции] AS [StreamID],
+    [IDТурнира] AS [TournamentID],
+    [IDМатча] AS [MatchID],
+    [Платформа] AS [Platform],
+    [СсылкаТрансляции] AS [StreamURL]
+FROM [dbo].[Трансляции];
+GO
+
+CREATE VIEW [dbo].[TournamentSponsors]
+AS
+SELECT
+    [IDТурнира] AS [TournamentID],
+    [IDСпонсора] AS [SponsorID],
+    [СуммаСпонсорства] AS [SponsorshipAmount],
+    [Валюта] AS [Currency]
+FROM [dbo].[СпонсорыТурниров];
 GO

@@ -185,17 +185,17 @@ WHERE [MatchID] IN (
                 throw new ArgumentNullException(nameof(importedTable));
             }
 
-            string safeTable = EscapeIdentifier(tableName);
+            string safePhysicalTable = EscapeIdentifier(SqlSchemaMap.GetPhysicalTableName(tableName));
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlTransaction transaction = connection.BeginTransaction())
             {
                 string identityColumn = GetIdentityColumn(tableName, connection, transaction);
                 bool useIdentityInsert = identityColumn != null && importedTable.Rows.Count > 0;
 
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[" + safeTable + "]", null);
+                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[" + safePhysicalTable + "]", null);
                 if (useIdentityInsert)
                 {
-                    ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safeTable + "] ON", null);
+                    ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] ON", null);
                 }
 
                 try
@@ -208,14 +208,14 @@ WHERE [MatchID] IN (
                             values[column.ColumnName] = row[column] == DBNull.Value ? null : row[column];
                         }
 
-                        InsertRow(connection, transaction, tableName, values, true, false);
+                        InsertPhysicalRow(connection, transaction, tableName, values, true);
                     }
                 }
                 finally
                 {
                     if (useIdentityInsert)
                     {
-                        ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safeTable + "] OFF", null);
+                        ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] OFF", null);
                     }
                 }
 
@@ -444,13 +444,13 @@ WHERE [MatchID] IN (
             using (SqlCommand command = connection.CreateCommand())
             {
                 command.Transaction = transaction;
-                string safeTableName = EscapeIdentifier(tableName);
-                string safeColumnName = EscapeIdentifier(columnName);
+                string safeTableName = EscapeIdentifier(SqlSchemaMap.GetPhysicalTableName(tableName));
+                string safeColumnName = EscapeIdentifier(SqlSchemaMap.GetPhysicalColumnName(tableName, columnName));
 
                 command.CommandText = $@"
-IF COL_LENGTH('dbo.{safeTableName}', '{safeColumnName}') IS NULL
+IF COL_LENGTH(N'dbo.{safeTableName}', N'{safeColumnName}') IS NULL
 BEGIN
-    EXEC('ALTER TABLE [dbo].[{safeTableName}] ADD [{safeColumnName}] INT NULL');
+    EXEC(N'ALTER TABLE [dbo].[{safeTableName}] ADD [{safeColumnName}] INT NULL');
     SELECT CAST(1 AS bit);
 END
 ELSE
@@ -477,7 +477,7 @@ FROM sys.identity_columns ic
 INNER JOIN sys.tables t ON t.object_id = ic.object_id
 INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
 WHERE s.name = 'dbo' AND t.name = @TableName";
-                AddParameter(command, "@TableName", tableName);
+                AddParameter(command, "@TableName", SqlSchemaMap.GetPhysicalTableName(tableName));
 
                 object result = command.ExecuteScalar();
                 return result == null || result == DBNull.Value ? (int?)null : Convert.ToInt32(result);
@@ -505,7 +505,7 @@ FROM sys.columns c
 INNER JOIN sys.tables t ON t.object_id = c.object_id
 INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
 WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
-                AddParameter(command, "@TableName", tableName);
+                AddParameter(command, "@TableName", SqlSchemaMap.GetPhysicalTableName(tableName));
 
                 object result = command.ExecuteScalar();
                 _identityResolved.Add(tableName);
@@ -530,6 +530,41 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
             };
 
             return InsertRow(connection, transaction, "TournamentStages", values, true, true);
+        }
+
+        private void InsertPhysicalRow(SqlConnection connection, SqlTransaction transaction, string tableName, IDictionary<string, object> values, bool includeNullValues)
+        {
+            string safePhysicalTable = EscapeIdentifier(SqlSchemaMap.GetPhysicalTableName(tableName));
+            IReadOnlyCollection<string> availableColumns = GetColumns(tableName);
+            List<KeyValuePair<string, object>> columnsToInsert = values
+                .Where(pair => ContainsColumn(availableColumns, pair.Key) && (includeNullValues || pair.Value != null))
+                .ToList();
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                if (columnsToInsert.Count == 0)
+                {
+                    command.CommandText = "INSERT INTO [dbo].[" + safePhysicalTable + "] DEFAULT VALUES";
+                }
+                else
+                {
+                    List<string> columnNames = new List<string>();
+                    List<string> parameterNames = new List<string>();
+                    for (int index = 0; index < columnsToInsert.Count; index++)
+                    {
+                        string physicalColumnName = EscapeIdentifier(SqlSchemaMap.GetPhysicalColumnName(tableName, columnsToInsert[index].Key));
+                        string parameterName = "@P" + index;
+                        columnNames.Add("[" + physicalColumnName + "]");
+                        parameterNames.Add(parameterName);
+                        AddParameter(command, parameterName, columnsToInsert[index].Value);
+                    }
+
+                    command.CommandText = "INSERT INTO [dbo].[" + safePhysicalTable + "] (" + string.Join(", ", columnNames) + ") VALUES (" + string.Join(", ", parameterNames) + ")";
+                }
+
+                command.ExecuteNonQuery();
+            }
         }
 
         private int GetNextMatchNumber(SqlConnection connection, SqlTransaction transaction, int tournamentId)
