@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using Tournaments.WPF.Models;
 
@@ -257,11 +258,17 @@ namespace Tournaments.WPF.Services
             }
 
             EntityDefinition effectiveDefinition = GetEffectiveDefinition(definition);
+            ApplyPrimaryKey(importedTable, effectiveDefinition.KeyColumns);
             Dictionary<string, DataTable> snapshotTables = GetEffectiveDefinitions()
                 .ToDictionary(item => item.TableName, item => GetTable(item.TableName), StringComparer.OrdinalIgnoreCase);
+            ApplyPrimaryKey(snapshotTables[effectiveDefinition.TableName], effectiveDefinition.KeyColumns);
+
+            DatabaseService currentDatabase = CreateSnapshot(snapshotTables);
+            ValidateRemovedRows(effectiveDefinition, snapshotTables[effectiveDefinition.TableName], importedTable, currentDatabase);
 
             DataTable importedCopy = importedTable.Copy();
             importedCopy.TableName = effectiveDefinition.TableName;
+            ApplyPrimaryKey(importedCopy, effectiveDefinition.KeyColumns);
             snapshotTables[effectiveDefinition.TableName] = importedCopy;
 
             DatabaseService validationDatabase = CreateSnapshot(snapshotTables);
@@ -295,6 +302,112 @@ namespace Tournaments.WPF.Services
         private static bool ContainsColumn(IReadOnlyCollection<string> columns, string columnName)
         {
             return columns.Any(column => string.Equals(column, columnName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static void ApplyPrimaryKey(DataTable table, IEnumerable<string> keyColumns)
+        {
+            if (table == null || keyColumns == null)
+            {
+                return;
+            }
+
+            List<DataColumn> columns = keyColumns
+                .Where(keyColumn => table.Columns.Contains(keyColumn))
+                .Select(keyColumn => table.Columns[keyColumn])
+                .ToList();
+
+            if (columns.Count == 0)
+            {
+                return;
+            }
+
+            table.PrimaryKey = columns.ToArray();
+        }
+
+        private static void ValidateRemovedRows(EntityDefinition definition, DataTable currentTable, DataTable importedTable, DatabaseService database)
+        {
+            if (definition == null || currentTable == null || importedTable == null || definition.DeleteValidator == null)
+            {
+                return;
+            }
+
+            string[] keyColumns = definition.KeyColumns
+                .Where(keyColumn => currentTable.Columns.Contains(keyColumn) && importedTable.Columns.Contains(keyColumn))
+                .ToArray();
+            if (keyColumns.Length == 0)
+            {
+                return;
+            }
+
+            HashSet<string> importedKeys = new HashSet<string>(
+                importedTable.Rows.Cast<DataRow>().Select(row => BuildKeySignature(row, keyColumns)),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (DataRow currentRow in currentTable.Rows)
+            {
+                if (importedKeys.Contains(BuildKeySignature(currentRow, keyColumns)))
+                {
+                    continue;
+                }
+
+                Dictionary<string, object> values = ToDictionary(currentRow);
+                EntityEditContext context = new EntityEditContext(false, values, values, database);
+                EntityValidationResult result = definition.DeleteValidator(context);
+                if (result.IsValid)
+                {
+                    continue;
+                }
+
+                throw new InvalidOperationException(
+                    "Таблица \"" + definition.Title + "\": импорт удаляет запись (" + DescribeKey(currentRow, keyColumns) + "), но это нельзя сделать. " + result.Message);
+            }
+        }
+
+        private static string BuildKeySignature(DataRow row, IEnumerable<string> keyColumns)
+        {
+            return string.Join("|", keyColumns.Select(keyColumn => FormatKeyValue(row[keyColumn])));
+        }
+
+        private static string DescribeKey(DataRow row, IEnumerable<string> keyColumns)
+        {
+            return string.Join(", ", keyColumns.Select(keyColumn => keyColumn + "=" + FormatKeyValue(row[keyColumn])));
+        }
+
+        private static string FormatKeyValue(object value)
+        {
+            if (value == null || value == DBNull.Value)
+            {
+                return "NULL";
+            }
+
+            if (value is DateTime dateTime)
+            {
+                return dateTime.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            if (value is bool booleanValue)
+            {
+                return booleanValue ? "1" : "0";
+            }
+
+            if (value is decimal || value is double || value is float)
+            {
+                return Convert.ToDecimal(value).ToString(CultureInfo.InvariantCulture);
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        private static Dictionary<string, object> ToDictionary(DataRow row)
+        {
+            Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataColumn column in row.Table.Columns)
+            {
+                object value = row[column.ColumnName];
+                values[column.ColumnName] = value == DBNull.Value ? null : value;
+            }
+
+            return values;
         }
 
         private UserProfileData GetPlayerProfile(string login)

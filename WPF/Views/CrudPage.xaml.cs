@@ -425,7 +425,7 @@ namespace Tournaments.WPF.Views
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Импорт остановлен: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Импорт остановлен: " + NormalizePersistenceErrorMessage(ex.Message), "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

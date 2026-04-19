@@ -37,7 +37,10 @@ namespace Tournaments.WPF.Services
                 int teamId = GetOriginalInt(context, "TeamID");
                 int participants = Count(context.Database, "TournamentParticipants", row => ValuesEqual(row["TeamID"], teamId));
                 int players = Count(context.Database, "TeamPlayers", row => ValuesEqual(row["TeamID"], teamId));
-                int matches = Count(context.Database, "Matches", row => ValuesEqual(row["Team1ID"], teamId) || ValuesEqual(row["Team2ID"], teamId));
+                int matches = Count(context.Database, "Matches", row =>
+                    ValuesEqual(row["Team1ID"], teamId) ||
+                    ValuesEqual(row["Team2ID"], teamId) ||
+                    ValuesEqual(row["WinnerTeamID"], teamId));
 
                 if (participants > 0 || players > 0 || matches > 0)
                 {
@@ -81,9 +84,15 @@ namespace Tournaments.WPF.Services
             {
                 int playerId = GetOriginalInt(context, "PlayerID");
                 int teamPlayers = Count(context.Database, "TeamPlayers", row => ValuesEqual(row["PlayerID"], playerId));
-                if (teamPlayers > 0)
+                int tournamentParticipants = Count(context.Database, "TournamentParticipants", row => ValuesEqual(row["PlayerID"], playerId));
+                int matches = Count(context.Database, "Matches", row =>
+                    ValuesEqual(row["Player1ID"], playerId) ||
+                    ValuesEqual(row["Player2ID"], playerId) ||
+                    ValuesEqual(row["WinnerPlayerID"], playerId));
+
+                if (teamPlayers > 0 || tournamentParticipants > 0 || matches > 0)
                 {
-                    return EntityValidationResult.Fail("Нельзя удалить игрока, пока он связан с составами команд.");
+                    return EntityValidationResult.Fail("Нельзя удалить игрока: есть связанные составы команд, участники турниров или матчи.");
                 }
 
                 return EntityValidationResult.Success();

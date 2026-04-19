@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Globalization;
 using System.Linq;
 using Tournaments.WPF.Models;
 
@@ -185,38 +186,77 @@ WHERE [MatchID] IN (
                 throw new ArgumentNullException(nameof(importedTable));
             }
 
+            string[] keyColumns = importedTable.PrimaryKey
+                .Select(column => column.ColumnName)
+                .ToArray();
             string safePhysicalTable = EscapeIdentifier(SqlSchemaMap.GetPhysicalTableName(tableName));
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlTransaction transaction = connection.BeginTransaction())
             {
-                string identityColumn = GetIdentityColumn(tableName, connection, transaction);
-                bool useIdentityInsert = identityColumn != null && importedTable.Rows.Count > 0;
-
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[" + safePhysicalTable + "]", null);
-                if (useIdentityInsert)
+                if (keyColumns.Length == 0)
                 {
-                    ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] ON", null);
+                    ReplaceTableContentsWithoutKeys(connection, transaction, tableName, importedTable, safePhysicalTable);
+                    transaction.Commit();
+                    return;
                 }
+
+                DataTable existingTable = LoadWholeTable(tableName, connection, transaction);
+                Dictionary<string, DataRow> existingRows = BuildKeyMap(existingTable, tableName, keyColumns);
+                Dictionary<string, DataRow> importedRows = BuildKeyMap(importedTable, tableName, keyColumns);
+
+                string identityColumn = GetIdentityColumn(tableName, connection, transaction);
+                HashSet<string> keySet = new HashSet<string>(keyColumns, StringComparer.OrdinalIgnoreCase);
 
                 try
                 {
-                    foreach (DataRow row in importedTable.Rows)
+                    foreach (KeyValuePair<string, DataRow> entry in existingRows.Where(entry => !importedRows.ContainsKey(entry.Key)))
                     {
-                        Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-                        foreach (DataColumn column in importedTable.Columns)
+                        DeleteRow(connection, transaction, tableName, keyColumns, ToDictionary(entry.Value));
+                    }
+
+                    foreach (KeyValuePair<string, DataRow> entry in importedRows.Where(entry => existingRows.ContainsKey(entry.Key)))
+                    {
+                        Dictionary<string, object> valuesToUpdate = ToDictionary(entry.Value, columnName =>
+                            keySet.Contains(columnName) ||
+                            IsIdentityColumn(tableName, columnName, identityColumn));
+                        if (valuesToUpdate.Count == 0)
                         {
-                            values[column.ColumnName] = row[column] == DBNull.Value ? null : row[column];
+                            continue;
                         }
 
-                        InsertPhysicalRow(connection, transaction, tableName, values, true);
+                        UpdateRow(connection, transaction, tableName, keyColumns, valuesToUpdate, ToDictionary(existingRows[entry.Key]));
                     }
-                }
-                finally
-                {
+
+                    List<DataRow> rowsToInsert = importedRows
+                        .Where(entry => !existingRows.ContainsKey(entry.Key))
+                        .Select(entry => entry.Value)
+                        .ToList();
+
+                    bool useIdentityInsert = identityColumn != null && rowsToInsert.Count > 0;
                     if (useIdentityInsert)
                     {
-                        ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] OFF", null);
+                        ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] ON", null);
                     }
+
+                    try
+                    {
+                        foreach (DataRow row in rowsToInsert)
+                        {
+                            InsertPhysicalRow(connection, transaction, tableName, ToDictionary(row), true);
+                        }
+                    }
+                    finally
+                    {
+                        if (useIdentityInsert)
+                        {
+                            ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] OFF", null);
+                        }
+                    }
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
                 }
 
                 transaction.Commit();
@@ -564,6 +604,33 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
                 }
 
                 command.ExecuteNonQuery();
+            }
+        }
+
+        private void ReplaceTableContentsWithoutKeys(SqlConnection connection, SqlTransaction transaction, string tableName, DataTable importedTable, string safePhysicalTable)
+        {
+            string identityColumn = GetIdentityColumn(tableName, connection, transaction);
+            bool useIdentityInsert = identityColumn != null && importedTable.Rows.Count > 0;
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[" + safePhysicalTable + "]", null);
+            if (useIdentityInsert)
+            {
+                ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] ON", null);
+            }
+
+            try
+            {
+                foreach (DataRow row in importedTable.Rows)
+                {
+                    InsertPhysicalRow(connection, transaction, tableName, ToDictionary(row), true);
+                }
+            }
+            finally
+            {
+                if (useIdentityInsert)
+                {
+                    ExecuteNonQuery(connection, transaction, "SET IDENTITY_INSERT [dbo].[" + safePhysicalTable + "] OFF", null);
+                }
             }
         }
 
@@ -1110,6 +1177,89 @@ WHERE S.[TournamentID] = @TournamentID
         private static bool ContainsColumn(IReadOnlyCollection<string> columns, string columnName)
         {
             return columns.Any(column => string.Equals(column, columnName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static Dictionary<string, DataRow> BuildKeyMap(DataTable table, string tableName, IReadOnlyList<string> keyColumns)
+        {
+            Dictionary<string, DataRow> rows = new Dictionary<string, DataRow>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataRow row in table.Rows)
+            {
+                rows.Add(BuildKeySignature(tableName, row, keyColumns), row);
+            }
+
+            return rows;
+        }
+
+        private static string BuildKeySignature(string tableName, DataRow row, IEnumerable<string> keyColumns)
+        {
+            List<string> parts = new List<string>();
+            foreach (string keyColumn in keyColumns)
+            {
+                if (!row.Table.Columns.Contains(keyColumn))
+                {
+                    throw new InvalidOperationException("В таблице \"" + tableName + "\" отсутствует ключевой столбец \"" + keyColumn + "\".");
+                }
+
+                object value = row[keyColumn];
+                if (value == null || value == DBNull.Value)
+                {
+                    throw new InvalidOperationException("В таблице \"" + tableName + "\" ключевой столбец \"" + keyColumn + "\" содержит пустое значение.");
+                }
+
+                parts.Add(FormatKeyValue(value));
+            }
+
+            return string.Join("|", parts);
+        }
+
+        private static string FormatKeyValue(object value)
+        {
+            if (value is DateTime dateTime)
+            {
+                return dateTime.ToString("O", CultureInfo.InvariantCulture);
+            }
+
+            if (value is decimal || value is double || value is float)
+            {
+                return Convert.ToDecimal(value).ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (value is bool booleanValue)
+            {
+                return booleanValue ? "1" : "0";
+            }
+
+            return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        private static Dictionary<string, object> ToDictionary(DataRow row, Func<string, bool> shouldSkipColumn = null)
+        {
+            Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            foreach (DataColumn column in row.Table.Columns)
+            {
+                if (shouldSkipColumn != null && shouldSkipColumn(column.ColumnName))
+                {
+                    continue;
+                }
+
+                object value = row[column.ColumnName];
+                values[column.ColumnName] = value == DBNull.Value ? null : value;
+            }
+
+            return values;
+        }
+
+        private static bool IsIdentityColumn(string tableName, string logicalColumnName, string physicalIdentityColumnName)
+        {
+            if (string.IsNullOrWhiteSpace(physicalIdentityColumnName))
+            {
+                return false;
+            }
+
+            return string.Equals(
+                SqlSchemaMap.GetPhysicalColumnName(tableName, logicalColumnName),
+                physicalIdentityColumnName,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         private static void AddParameter(SqlCommand command, string parameterName, object value)
