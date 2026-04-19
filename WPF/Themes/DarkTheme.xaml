@@ -2,15 +2,25 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#FF0F172A" />
   <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="#FFE5EEF6" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.ActiveCaptionBrushKey}" Color="#FF172033" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.ActiveCaptionTextBrushKey}" Color="#FFF8FAFC" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.AppWorkspaceBrushKey}" Color="#FF0F172A" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="#FF172033" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="#FFE5EEF6" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightBrushKey}" Color="#FF243147" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlLightLightBrushKey}" Color="#FF334155" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkBrushKey}" Color="#FF223047" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ControlDarkDarkBrushKey}" Color="#FF08111F" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.DesktopBrushKey}" Color="#FF0F172A" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.GradientActiveCaptionBrushKey}" Color="#FF172033" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.GradientInactiveCaptionBrushKey}" Color="#FF172033" />
   <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="#FF7D91A8" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#FF2C7FB8" />
   <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="#FFF8FAFC" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.HotTrackBrushKey}" Color="#FF7CC3FF" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveBorderBrushKey}" Color="#FF334155" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveCaptionBrushKey}" Color="#FF172033" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.InactiveCaptionTextBrushKey}" Color="#FFE5EEF6" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#FF223047" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="#FFE5EEF6" />
   <SolidColorBrush x:Key="{x:Static SystemColors.InfoBrushKey}" Color="#FF1B2A41" />
@@ -18,6 +28,7 @@
   <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#FF172033" />
   <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#FFE5EEF6" />
   <SolidColorBrush x:Key="{x:Static SystemColors.ScrollBarBrushKey}" Color="#FF172033" />
+  <SolidColorBrush x:Key="{x:Static SystemColors.WindowFrameBrushKey}" Color="#FF334155" />
   <SolidColorBrush x:Key="AccentBrush" Color="#FF5AA9E6" />
   <SolidColorBrush x:Key="AccentDarkBrush" Color="#FF2C7FB8" />
   <SolidColorBrush x:Key="SurfaceBrush" Color="#FF0F172A" />
@@ -35,8 +46,8 @@
   <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF0F1B2D" />
   <SolidColorBrush x:Key="ControlBorderBrush" Color="#FF475569" />
   <SolidColorBrush x:Key="ControlForegroundBrush" Color="#FFE5EEF6" />
-  <SolidColorBrush x:Key="ComboBoxDisplayForegroundBrush" Color="#FF000000" />
-  <SolidColorBrush x:Key="ComboBoxSelectionForegroundBrush" Color="#FF000000" />
+  <SolidColorBrush x:Key="ComboBoxDisplayForegroundBrush" Color="#FFE5EEF6" />
+  <SolidColorBrush x:Key="ComboBoxSelectionForegroundBrush" Color="#FFF8FAFC" />
   <SolidColorBrush x:Key="PrimaryButtonForegroundBrush" Color="#FFF8FAFC" />
   <SolidColorBrush x:Key="SecondaryButtonBackgroundBrush" Color="#FF1B2A41" />
   <SolidColorBrush x:Key="SecondaryButtonForegroundBrush" Color="#FFE5EEF6" />

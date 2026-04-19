@@ -118,7 +118,8 @@
             <Style TargetType="ListBoxItem">
               <Setter Property="Margin" Value="0,0,0,8" />
               <Setter Property="Padding" Value="14,10" />
-              <Setter Property="Background" Value="#00000000" />
+              <Setter Property="Foreground" Value="{DynamicResource PanelTextBrush}" />
+              <Setter Property="Background" Value="Transparent" />
               <Setter Property="Template">
                 <Setter.Value>
                   <ControlTemplate TargetType="ListBoxItem">

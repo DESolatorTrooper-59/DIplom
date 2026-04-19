@@ -153,28 +153,22 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        public void DeleteCascade(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlTransaction transaction = connection.BeginTransaction())
+            {
+                DeleteCascadeInternal(connection, transaction, tableName, keyColumns, originalValues);
+                transaction.Commit();
+            }
+        }
+
         public void DeleteTournamentCascade(int tournamentId)
         {
             using (SqlConnection connection = CreateOpenConnection())
             using (SqlTransaction transaction = connection.BeginTransaction())
             {
-                ExecuteNonQuery(connection, transaction, @"
-DELETE FROM [dbo].[Streams]
-WHERE [MatchID] IN (
-    SELECT [MatchID]
-    FROM [dbo].[Matches]
-    WHERE [TournamentID] = @TournamentID
-)", command => AddParameter(command, "@TournamentID", tournamentId));
-
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
-                ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentSponsors] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
-                DeleteRow(connection, transaction, "Tournaments", new[] { "TournamentID" }, new Dictionary<string, object>
-                {
-                    ["TournamentID"] = tournamentId
-                });
-
+                DeleteTournamentCascadeInternal(connection, transaction, tournamentId);
                 transaction.Commit();
             }
         }
@@ -768,6 +762,155 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
             }
 
             return whereParts;
+        }
+
+        private void DeleteCascadeInternal(SqlConnection connection, SqlTransaction transaction, string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            switch (tableName)
+            {
+                case "Tournaments":
+                    DeleteTournamentCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "TournamentID"));
+                    return;
+                case "Teams":
+                    DeleteTeamCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "TeamID"));
+                    return;
+                case "Players":
+                    DeletePlayerCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "PlayerID"));
+                    return;
+                case "GameTitles":
+                    DeleteGameCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "GameID"));
+                    return;
+                case "Sponsors":
+                    DeleteSponsorCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "SponsorID"));
+                    return;
+                case "TournamentStages":
+                    DeleteStageCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "StageID"));
+                    return;
+                case "Matches":
+                    DeleteMatchCascadeInternal(connection, transaction, GetRequiredInt(originalValues, "MatchID"));
+                    return;
+                default:
+                    DeleteRow(connection, transaction, tableName, keyColumns, originalValues);
+                    return;
+            }
+        }
+
+        private void DeleteTournamentCascadeInternal(SqlConnection connection, SqlTransaction transaction, int tournamentId)
+        {
+            ExecuteNonQuery(connection, transaction, @"
+DELETE FROM [dbo].[Streams]
+WHERE [TournamentID] = @TournamentID
+   OR [MatchID] IN (
+        SELECT [MatchID]
+        FROM [dbo].[Matches]
+        WHERE [TournamentID] = @TournamentID
+   )", command => AddParameter(command, "@TournamentID", tournamentId));
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentStages] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentParticipants] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentSponsors] WHERE [TournamentID] = @TournamentID", command => AddParameter(command, "@TournamentID", tournamentId));
+            DeleteRow(connection, transaction, "Tournaments", new[] { "TournamentID" }, new Dictionary<string, object>
+            {
+                ["TournamentID"] = tournamentId
+            });
+        }
+
+        private void DeleteTeamCascadeInternal(SqlConnection connection, SqlTransaction transaction, int teamId)
+        {
+            ExecuteNonQuery(connection, transaction, @"
+DELETE FROM [dbo].[Streams]
+WHERE [MatchID] IN (
+    SELECT [MatchID]
+    FROM [dbo].[Matches]
+    WHERE [Team1ID] = @TeamID OR [Team2ID] = @TeamID OR [WinnerTeamID] = @TeamID
+)", command => AddParameter(command, "@TeamID", teamId));
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [Team1ID] = @TeamID OR [Team2ID] = @TeamID OR [WinnerTeamID] = @TeamID", command => AddParameter(command, "@TeamID", teamId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentParticipants] WHERE [TeamID] = @TeamID", command => AddParameter(command, "@TeamID", teamId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TeamPlayers] WHERE [TeamID] = @TeamID", command => AddParameter(command, "@TeamID", teamId));
+            DeleteRow(connection, transaction, "Teams", new[] { "TeamID" }, new Dictionary<string, object>
+            {
+                ["TeamID"] = teamId
+            });
+        }
+
+        private void DeletePlayerCascadeInternal(SqlConnection connection, SqlTransaction transaction, int playerId)
+        {
+            ExecuteNonQuery(connection, transaction, @"
+DELETE FROM [dbo].[Streams]
+WHERE [MatchID] IN (
+    SELECT [MatchID]
+    FROM [dbo].[Matches]
+    WHERE [Player1ID] = @PlayerID OR [Player2ID] = @PlayerID OR [WinnerPlayerID] = @PlayerID
+)", command => AddParameter(command, "@PlayerID", playerId));
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [Player1ID] = @PlayerID OR [Player2ID] = @PlayerID OR [WinnerPlayerID] = @PlayerID", command => AddParameter(command, "@PlayerID", playerId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentParticipants] WHERE [PlayerID] = @PlayerID", command => AddParameter(command, "@PlayerID", playerId));
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TeamPlayers] WHERE [PlayerID] = @PlayerID", command => AddParameter(command, "@PlayerID", playerId));
+            DeleteRow(connection, transaction, "Players", new[] { "PlayerID" }, new Dictionary<string, object>
+            {
+                ["PlayerID"] = playerId
+            });
+        }
+
+        private void DeleteGameCascadeInternal(SqlConnection connection, SqlTransaction transaction, int gameId)
+        {
+            DataTable tournaments = ExecuteTableQuery(connection, transaction, "SELECT [TournamentID] FROM [dbo].[Tournaments] WHERE [GameID] = @GameID", "Tournaments", command => AddParameter(command, "@GameID", gameId));
+            foreach (DataRow tournament in tournaments.Rows)
+            {
+                DeleteTournamentCascadeInternal(connection, transaction, Convert.ToInt32(tournament["TournamentID"]));
+            }
+
+            DeleteRow(connection, transaction, "GameTitles", new[] { "GameID" }, new Dictionary<string, object>
+            {
+                ["GameID"] = gameId
+            });
+        }
+
+        private void DeleteSponsorCascadeInternal(SqlConnection connection, SqlTransaction transaction, int sponsorId)
+        {
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[TournamentSponsors] WHERE [SponsorID] = @SponsorID", command => AddParameter(command, "@SponsorID", sponsorId));
+            DeleteRow(connection, transaction, "Sponsors", new[] { "SponsorID" }, new Dictionary<string, object>
+            {
+                ["SponsorID"] = sponsorId
+            });
+        }
+
+        private void DeleteStageCascadeInternal(SqlConnection connection, SqlTransaction transaction, int stageId)
+        {
+            ExecuteNonQuery(connection, transaction, @"
+DELETE FROM [dbo].[Streams]
+WHERE [MatchID] IN (
+    SELECT [MatchID]
+    FROM [dbo].[Matches]
+    WHERE [StageID] = @StageID
+)", command => AddParameter(command, "@StageID", stageId));
+
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Matches] WHERE [StageID] = @StageID", command => AddParameter(command, "@StageID", stageId));
+            DeleteRow(connection, transaction, "TournamentStages", new[] { "StageID" }, new Dictionary<string, object>
+            {
+                ["StageID"] = stageId
+            });
+        }
+
+        private void DeleteMatchCascadeInternal(SqlConnection connection, SqlTransaction transaction, int matchId)
+        {
+            ExecuteNonQuery(connection, transaction, "DELETE FROM [dbo].[Streams] WHERE [MatchID] = @MatchID", command => AddParameter(command, "@MatchID", matchId));
+            DeleteRow(connection, transaction, "Matches", new[] { "MatchID" }, new Dictionary<string, object>
+            {
+                ["MatchID"] = matchId
+            });
+        }
+
+        private static int GetRequiredInt(IDictionary<string, object> values, string keyName)
+        {
+            if (values == null || string.IsNullOrWhiteSpace(keyName) || !values.ContainsKey(keyName) || values[keyName] == null || values[keyName] == DBNull.Value)
+            {
+                throw new InvalidOperationException("Не удалось определить ключ для каскадного удаления: " + keyName);
+            }
+
+            return Convert.ToInt32(values[keyName]);
         }
 
         private List<int> GetOrderedParticipantIds(int tournamentId, bool isPlayerMode, SqlConnection connection, SqlTransaction transaction)

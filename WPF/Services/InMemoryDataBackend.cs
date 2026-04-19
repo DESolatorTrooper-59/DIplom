@@ -85,6 +85,11 @@ namespace Tournaments.WPF.Services
             _store.Delete(tableName, keyColumns, originalValues);
         }
 
+        public void DeleteCascade(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            _store.DeleteCascade(tableName, keyColumns, originalValues);
+        }
+
         public void DeleteTournamentCascade(int tournamentId)
         {
             _store.DeleteTournamentCascade(tournamentId);

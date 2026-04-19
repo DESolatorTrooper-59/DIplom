@@ -6,6 +6,48 @@
     <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
   </Style>
 
+  <Style TargetType="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style TargetType="AccessText">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style TargetType="Label">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style TargetType="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,6" />
+  </Style>
+
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style TargetType="MenuItem">
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
+  <Style TargetType="GroupBox">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style TargetType="RadioButton">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+
   <Style TargetType="Button">
     <Setter Property="Margin" Value="0,0,10,0" />
     <Setter Property="Padding" Value="14,8" />
@@ -118,6 +160,61 @@
     <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
   </Style>
 
+  <Style TargetType="ListBoxItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+  </Style>
+
+  <Style TargetType="ListView">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+
+  <Style TargetType="ListViewItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+  </Style>
+
+  <Style TargetType="TreeView">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+
+  <Style TargetType="TreeViewItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+  </Style>
+
+  <Style TargetType="Expander">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+  </Style>
+
+  <Style TargetType="TabControl">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+
+  <Style TargetType="TabItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+
+  <Style TargetType="StatusBar">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+  </Style>
+
+  <Style TargetType="StatusBarItem">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource CardBrush}" />
+  </Style>
+
   <Style TargetType="ComboBoxItem">
     <Setter Property="Background" Value="{DynamicResource ControlBackgroundBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource ControlForegroundBrush}" />
@@ -218,6 +315,12 @@
     <Setter Property="Foreground" Value="{DynamicResource GridHeaderForegroundBrush}" />
     <Setter Property="BorderBrush" Value="{DynamicResource GridHeaderBorderBrush}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
+  </Style>
+
+  <Style TargetType="DataGridRowHeader">
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    <Setter Property="Background" Value="{DynamicResource GridHeaderBackgroundBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource GridHeaderBorderBrush}" />
   </Style>
 
   <Style TargetType="DataGridCell">

@@ -101,6 +101,11 @@ namespace Tournaments.WPF.Services
             throw CreateUnsupportedException();
         }
 
+        public void DeleteCascade(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            throw CreateUnsupportedException();
+        }
+
         public void DeleteTournamentCascade(int tournamentId)
         {
             throw CreateUnsupportedException();

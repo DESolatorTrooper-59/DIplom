@@ -173,9 +173,56 @@ namespace Tournaments.WPF.Services
             _backend.Delete(tableName, keyColumns, originalValues);
         }
 
+        public void DeleteCascade(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            _backend.DeleteCascade(tableName, keyColumns, originalValues);
+        }
+
         public void DeleteTournamentCascade(int tournamentId)
         {
             _backend.DeleteTournamentCascade(tournamentId);
+        }
+
+        public IReadOnlyList<string> GetCascadeDependencyLines(string tableName, IDictionary<string, object> originalValues)
+        {
+            if (string.IsNullOrWhiteSpace(tableName) || originalValues == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            switch (tableName)
+            {
+                case "Tournaments":
+                    return TryGetInt(originalValues, "TournamentID").HasValue
+                        ? BuildTournamentDependencyLines(TryGetInt(originalValues, "TournamentID").Value)
+                        : Array.Empty<string>();
+                case "Teams":
+                    return TryGetInt(originalValues, "TeamID").HasValue
+                        ? BuildTeamDependencyLines(TryGetInt(originalValues, "TeamID").Value)
+                        : Array.Empty<string>();
+                case "Players":
+                    return TryGetInt(originalValues, "PlayerID").HasValue
+                        ? BuildPlayerDependencyLines(TryGetInt(originalValues, "PlayerID").Value)
+                        : Array.Empty<string>();
+                case "GameTitles":
+                    return TryGetInt(originalValues, "GameID").HasValue
+                        ? BuildGameDependencyLines(TryGetInt(originalValues, "GameID").Value)
+                        : Array.Empty<string>();
+                case "Sponsors":
+                    return TryGetInt(originalValues, "SponsorID").HasValue
+                        ? BuildSponsorDependencyLines(TryGetInt(originalValues, "SponsorID").Value)
+                        : Array.Empty<string>();
+                case "TournamentStages":
+                    return TryGetInt(originalValues, "StageID").HasValue
+                        ? BuildStageDependencyLines(TryGetInt(originalValues, "StageID").Value)
+                        : Array.Empty<string>();
+                case "Matches":
+                    return TryGetInt(originalValues, "MatchID").HasValue
+                        ? BuildMatchDependencyLines(TryGetInt(originalValues, "MatchID").Value)
+                        : Array.Empty<string>();
+                default:
+                    return Array.Empty<string>();
+            }
         }
 
         public EntityDefinition GetEffectiveDefinition(EntityDefinition definition)
@@ -324,6 +371,152 @@ namespace Tournaments.WPF.Services
             table.PrimaryKey = columns.ToArray();
         }
 
+        private List<string> BuildTournamentDependencyLines(int tournamentId)
+        {
+            DataTable stages = GetTable("TournamentStages");
+            DataTable participants = GetTable("TournamentParticipants");
+            DataTable matches = GetTable("Matches");
+            DataTable streams = GetTable("Streams");
+            DataTable sponsors = GetTable("TournamentSponsors");
+
+            int stageCount = stages.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], tournamentId));
+            int participantCount = participants.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], tournamentId));
+            HashSet<int> matchIds = GetMatchIds(matches.Rows.Cast<DataRow>().Where(row => ValuesEqual(row["TournamentID"], tournamentId)));
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row =>
+                ValuesEqual(row["TournamentID"], tournamentId) ||
+                (row.Table.Columns.Contains("MatchID") && row["MatchID"] != DBNull.Value && matchIds.Contains(Convert.ToInt32(row["MatchID"]))));
+            int sponsorCount = sponsors.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], tournamentId));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "этапы", stageCount);
+            AddDependencyLine(result, "участники", participantCount);
+            AddDependencyLine(result, "матчи", matchIds.Count);
+            AddDependencyLine(result, "трансляции", streamCount);
+            AddDependencyLine(result, "спонсоры турнира", sponsorCount);
+            return result;
+        }
+
+        private List<string> BuildTeamDependencyLines(int teamId)
+        {
+            DataTable teamPlayers = GetTable("TeamPlayers");
+            DataTable participants = GetTable("TournamentParticipants");
+            DataTable matches = GetTable("Matches");
+            DataTable streams = GetTable("Streams");
+
+            int teamPlayerCount = teamPlayers.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TeamID"], teamId));
+            int participantCount = participants.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TeamID"], teamId));
+            HashSet<int> matchIds = GetMatchIds(matches.Rows.Cast<DataRow>().Where(row =>
+                ValuesEqual(row["Team1ID"], teamId) ||
+                ValuesEqual(row["Team2ID"], teamId) ||
+                ValuesEqual(row["WinnerTeamID"], teamId)));
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row =>
+                row.Table.Columns.Contains("MatchID") &&
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "составы команды", teamPlayerCount);
+            AddDependencyLine(result, "участия в турнирах", participantCount);
+            AddDependencyLine(result, "матчи", matchIds.Count);
+            AddDependencyLine(result, "трансляции матчей", streamCount);
+            return result;
+        }
+
+        private List<string> BuildPlayerDependencyLines(int playerId)
+        {
+            DataTable teamPlayers = GetTable("TeamPlayers");
+            DataTable participants = GetTable("TournamentParticipants");
+            DataTable matches = GetTable("Matches");
+            DataTable streams = GetTable("Streams");
+
+            int teamPlayerCount = teamPlayers.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["PlayerID"], playerId));
+            int participantCount = participants.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["PlayerID"], playerId));
+            HashSet<int> matchIds = GetMatchIds(matches.Rows.Cast<DataRow>().Where(row =>
+                ValuesEqual(row["Player1ID"], playerId) ||
+                ValuesEqual(row["Player2ID"], playerId) ||
+                ValuesEqual(row["WinnerPlayerID"], playerId)));
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row =>
+                row.Table.Columns.Contains("MatchID") &&
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "составы команд", teamPlayerCount);
+            AddDependencyLine(result, "участия в турнирах", participantCount);
+            AddDependencyLine(result, "матчи", matchIds.Count);
+            AddDependencyLine(result, "трансляции матчей", streamCount);
+            return result;
+        }
+
+        private List<string> BuildGameDependencyLines(int gameId)
+        {
+            DataTable tournaments = GetTable("Tournaments");
+            DataTable stages = GetTable("TournamentStages");
+            DataTable participants = GetTable("TournamentParticipants");
+            DataTable matches = GetTable("Matches");
+            DataTable streams = GetTable("Streams");
+            DataTable sponsors = GetTable("TournamentSponsors");
+
+            HashSet<int> tournamentIds = new HashSet<int>(
+                tournaments.Rows.Cast<DataRow>()
+                    .Where(row => ValuesEqual(row["GameID"], gameId))
+                    .Select(row => Convert.ToInt32(row["TournamentID"])));
+            HashSet<int> matchIds = GetMatchIds(matches.Rows.Cast<DataRow>().Where(row => ValuesEqual(row["TournamentID"], null) ? false : tournamentIds.Contains(Convert.ToInt32(row["TournamentID"]))));
+
+            int stageCount = stages.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], null) ? false : tournamentIds.Contains(Convert.ToInt32(row["TournamentID"])));
+            int participantCount = participants.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], null) ? false : tournamentIds.Contains(Convert.ToInt32(row["TournamentID"])));
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row =>
+                (row.Table.Columns.Contains("TournamentID") && row["TournamentID"] != DBNull.Value && tournamentIds.Contains(Convert.ToInt32(row["TournamentID"]))) ||
+                (row.Table.Columns.Contains("MatchID") && row["MatchID"] != DBNull.Value && matchIds.Contains(Convert.ToInt32(row["MatchID"]))));
+            int sponsorCount = sponsors.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["TournamentID"], null) ? false : tournamentIds.Contains(Convert.ToInt32(row["TournamentID"])));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "турниры", tournamentIds.Count);
+            AddDependencyLine(result, "этапы турниров", stageCount);
+            AddDependencyLine(result, "участники турниров", participantCount);
+            AddDependencyLine(result, "матчи", matchIds.Count);
+            AddDependencyLine(result, "трансляции", streamCount);
+            AddDependencyLine(result, "связи турниров со спонсорами", sponsorCount);
+            return result;
+        }
+
+        private List<string> BuildSponsorDependencyLines(int sponsorId)
+        {
+            DataTable tournamentSponsors = GetTable("TournamentSponsors");
+            int tournamentSponsorCount = tournamentSponsors.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["SponsorID"], sponsorId));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "привязки к турнирам", tournamentSponsorCount);
+            return result;
+        }
+
+        private List<string> BuildStageDependencyLines(int stageId)
+        {
+            DataTable matches = GetTable("Matches");
+            DataTable streams = GetTable("Streams");
+
+            HashSet<int> matchIds = GetMatchIds(matches.Rows.Cast<DataRow>().Where(row => ValuesEqual(row["StageID"], stageId)));
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row =>
+                row.Table.Columns.Contains("MatchID") &&
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "матчи", matchIds.Count);
+            AddDependencyLine(result, "трансляции", streamCount);
+            return result;
+        }
+
+        private List<string> BuildMatchDependencyLines(int matchId)
+        {
+            DataTable streams = GetTable("Streams");
+            int streamCount = streams.Rows.Cast<DataRow>().Count(row => ValuesEqual(row["MatchID"], matchId));
+
+            List<string> result = new List<string>();
+            AddDependencyLine(result, "трансляции", streamCount);
+            return result;
+        }
+
         private static void ValidateRemovedRows(EntityDefinition definition, DataTable currentTable, DataTable importedTable, DatabaseService database)
         {
             if (definition == null || currentTable == null || importedTable == null || definition.DeleteValidator == null)
@@ -396,6 +589,77 @@ namespace Tournaments.WPF.Services
             }
 
             return Convert.ToString(value, CultureInfo.InvariantCulture);
+        }
+
+        private static int? TryGetInt(IDictionary<string, object> values, string keyName)
+        {
+            if (values == null || string.IsNullOrWhiteSpace(keyName) || !values.ContainsKey(keyName))
+            {
+                return null;
+            }
+
+            object value = values[keyName];
+            return value == null || value == DBNull.Value ? (int?)null : Convert.ToInt32(value);
+        }
+
+        private static HashSet<int> GetMatchIds(IEnumerable<DataRow> rows)
+        {
+            return new HashSet<int>(
+                rows.Where(row => row.Table.Columns.Contains("MatchID") && row["MatchID"] != DBNull.Value)
+                    .Select(row => Convert.ToInt32(row["MatchID"])));
+        }
+
+        private static void AddDependencyLine(ICollection<string> lines, string label, int count)
+        {
+            if (count > 0)
+            {
+                lines.Add(label + ": " + count);
+            }
+        }
+
+        private static bool ValuesEqual(object left, object right)
+        {
+            if (left == DBNull.Value)
+            {
+                left = null;
+            }
+
+            if (right == DBNull.Value)
+            {
+                right = null;
+            }
+
+            if (left == null && right == null)
+            {
+                return true;
+            }
+
+            if (left == null || right == null)
+            {
+                return false;
+            }
+
+            if (left is DateTime || right is DateTime)
+            {
+                return Convert.ToDateTime(left).Date == Convert.ToDateTime(right).Date;
+            }
+
+            if (left is bool || right is bool)
+            {
+                return Convert.ToBoolean(left) == Convert.ToBoolean(right);
+            }
+
+            if (left is decimal || right is decimal || left is double || right is double || left is float || right is float)
+            {
+                return Convert.ToDecimal(left) == Convert.ToDecimal(right);
+            }
+
+            if (left is string || right is string)
+            {
+                return string.Equals(Convert.ToString(left), Convert.ToString(right), StringComparison.CurrentCultureIgnoreCase);
+            }
+
+            return Convert.ToInt64(left) == Convert.ToInt64(right);
         }
 
         private static Dictionary<string, object> ToDictionary(DataRow row)

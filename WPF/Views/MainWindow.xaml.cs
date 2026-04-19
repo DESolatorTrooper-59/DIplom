@@ -87,6 +87,12 @@ namespace Tournaments.WPF.Views
 
             if (item.EntityDefinition != null)
             {
+                if (string.Equals(item.EntityDefinition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase))
+                {
+                    PageHost.Content = new TournamentCatalogPage(_database, _crud, _currentLogin, _role);
+                    return;
+                }
+
                 PageHost.Content = new CrudPage(_database, _crud, _database.GetEffectiveDefinition(item.EntityDefinition), _currentLogin, _role);
             }
         }

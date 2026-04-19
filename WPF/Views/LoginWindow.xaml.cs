@@ -835,7 +835,7 @@ namespace Tournaments.WPF.Views
                 Brushes.Transparent);
             icon.Foreground = ThemeManager.GetBrush(
                 "ThemeToggleIconBrush",
-                Brushes.Black);
+                ThemeManager.GetBrush("TextPrimaryBrush", Brushes.White));
         }
     }
 }

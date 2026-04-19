@@ -246,7 +246,7 @@ namespace Tournaments.WPF.Views
             EntityValidationResult validation = _definition.DeleteValidator == null ? EntityValidationResult.Success() : _definition.DeleteValidator(context);
             if (!validation.IsValid)
             {
-                if (TryForceDeleteTournament(originalValues))
+                if (TryForceDeleteEntity(originalValues))
                 {
                     return;
                 }
@@ -272,33 +272,28 @@ namespace Tournaments.WPF.Views
             }
         }
 
-        private bool TryForceDeleteTournament(IDictionary<string, object> originalValues)
+        private bool TryForceDeleteEntity(IDictionary<string, object> originalValues)
         {
-            if (!string.Equals(_definition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase) ||
-                originalValues == null ||
-                !originalValues.ContainsKey("TournamentID") ||
-                originalValues["TournamentID"] == null ||
-                originalValues["TournamentID"] == DBNull.Value)
+            if (originalValues == null)
             {
                 return false;
             }
 
-            int tournamentId = Convert.ToInt32(originalValues["TournamentID"]);
-            List<string> dependencyLines = BuildTournamentDependencyLines(tournamentId);
+            IReadOnlyList<string> dependencyLines = _database.GetCascadeDependencyLines(_definition.TableName, originalValues);
             if (dependencyLines.Count == 0)
             {
                 return false;
             }
 
             StringBuilder message = new StringBuilder();
-            message.AppendLine("У выбранного турнира есть связанные записи:");
+            message.AppendLine("У выбранной записи есть связанные данные:");
             foreach (string line in dependencyLines)
             {
                 message.AppendLine("- " + line);
             }
 
             message.AppendLine();
-            message.Append("Удалить турнир принудительно вместе со всеми этими записями?");
+            message.Append("Удалить запись принудительно вместе со всеми этими данными?");
             if (MessageBox.Show(message.ToString(), "Tournaments WPF", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                 return true;
@@ -306,9 +301,9 @@ namespace Tournaments.WPF.Views
 
             try
             {
-                _database.DeleteTournamentCascade(tournamentId);
+                _database.DeleteCascade(_definition.TableName, _definition.KeyColumns, originalValues);
                 LoadData();
-                ApplyFilter("Турнир и связанные записи удалены.");
+                ApplyFilter("Запись и связанные данные удалены.");
             }
             catch (Exception ex)
             {
@@ -316,42 +311,6 @@ namespace Tournaments.WPF.Views
             }
 
             return true;
-        }
-
-        private List<string> BuildTournamentDependencyLines(int tournamentId)
-        {
-            DataTable stages = _database.GetTable("TournamentStages");
-            DataTable participants = _database.GetTable("TournamentParticipants");
-            DataTable matches = _database.GetTable("Matches");
-            DataTable streams = _database.GetTable("Streams");
-            DataTable sponsors = _database.GetTable("TournamentSponsors");
-
-            int stageCount = stages.Rows.Cast<DataRow>().Count(row => row["TournamentID"] != DBNull.Value && Convert.ToInt32(row["TournamentID"]) == tournamentId);
-            int participantCount = participants.Rows.Cast<DataRow>().Count(row => row["TournamentID"] != DBNull.Value && Convert.ToInt32(row["TournamentID"]) == tournamentId);
-            List<int> matchIds = matches.Rows
-                .Cast<DataRow>()
-                .Where(row => row["TournamentID"] != DBNull.Value && Convert.ToInt32(row["TournamentID"]) == tournamentId)
-                .Select(row => Convert.ToInt32(row["MatchID"]))
-                .ToList();
-            HashSet<int> matchIdSet = new HashSet<int>(matchIds);
-            int streamCount = streams.Rows.Cast<DataRow>().Count(row => row["MatchID"] != DBNull.Value && matchIdSet.Contains(Convert.ToInt32(row["MatchID"])));
-            int sponsorCount = sponsors.Rows.Cast<DataRow>().Count(row => row["TournamentID"] != DBNull.Value && Convert.ToInt32(row["TournamentID"]) == tournamentId);
-
-            List<string> result = new List<string>();
-            AddDependencyLine(result, "этапы", stageCount);
-            AddDependencyLine(result, "участники", participantCount);
-            AddDependencyLine(result, "матчи", matchIds.Count);
-            AddDependencyLine(result, "трансляции", streamCount);
-            AddDependencyLine(result, "спонсоры", sponsorCount);
-            return result;
-        }
-
-        private static void AddDependencyLine(ICollection<string> lines, string label, int count)
-        {
-            if (count > 0)
-            {
-                lines.Add(label + ": " + count);
-            }
         }
 
         private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)

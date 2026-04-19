@@ -188,25 +188,19 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        public void DeleteCascade(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            lock (_syncRoot)
+            {
+                DeleteCascadeInternal(tableName, keyColumns, originalValues);
+            }
+        }
+
         public void DeleteTournamentCascade(int tournamentId)
         {
             lock (_syncRoot)
             {
-                DataTable matches = GetRequiredTable("Matches");
-                HashSet<int> matchIds = new HashSet<int>(
-                    matches.Rows
-                        .Cast<DataRow>()
-                        .Where(row => AreEqual(row["TournamentID"], tournamentId))
-                        .Select(row => Convert.ToInt32(row["MatchID"])));
-
-                RemoveRows(GetRequiredTable("Streams"), row =>
-                    row["MatchID"] != DBNull.Value &&
-                    matchIds.Contains(Convert.ToInt32(row["MatchID"])));
-                RemoveRows(matches, row => AreEqual(row["TournamentID"], tournamentId));
-                RemoveRows(GetRequiredTable("TournamentStages"), row => AreEqual(row["TournamentID"], tournamentId));
-                RemoveRows(GetRequiredTable("TournamentParticipants"), row => AreEqual(row["TournamentID"], tournamentId));
-                RemoveRows(GetRequiredTable("TournamentSponsors"), row => AreEqual(row["TournamentID"], tournamentId));
-                RemoveRows(GetRequiredTable("Tournaments"), row => AreEqual(row["TournamentID"], tournamentId));
+                DeleteTournamentCascadeInternal(tournamentId);
             }
         }
 
@@ -1022,6 +1016,159 @@ namespace Tournaments.WPF.Services
             return table.Rows
                 .Cast<DataRow>()
                 .FirstOrDefault(row => keyColumns.All(key => originalValues.ContainsKey(key) && AreEqual(row[key], originalValues[key])));
+        }
+
+        private void DeleteCascadeInternal(string tableName, string[] keyColumns, IDictionary<string, object> originalValues)
+        {
+            switch (tableName)
+            {
+                case "Tournaments":
+                    DeleteTournamentCascadeInternal(GetRequiredInt(originalValues, "TournamentID"));
+                    return;
+                case "Teams":
+                    DeleteTeamCascadeInternal(GetRequiredInt(originalValues, "TeamID"));
+                    return;
+                case "Players":
+                    DeletePlayerCascadeInternal(GetRequiredInt(originalValues, "PlayerID"));
+                    return;
+                case "GameTitles":
+                    DeleteGameCascadeInternal(GetRequiredInt(originalValues, "GameID"));
+                    return;
+                case "Sponsors":
+                    DeleteSponsorCascadeInternal(GetRequiredInt(originalValues, "SponsorID"));
+                    return;
+                case "TournamentStages":
+                    DeleteStageCascadeInternal(GetRequiredInt(originalValues, "StageID"));
+                    return;
+                case "Matches":
+                    DeleteMatchCascadeInternal(GetRequiredInt(originalValues, "MatchID"));
+                    return;
+                default:
+                    Delete(tableName, keyColumns, originalValues);
+                    return;
+            }
+        }
+
+        private void DeleteTournamentCascadeInternal(int tournamentId)
+        {
+            DataTable matches = GetRequiredTable("Matches");
+            HashSet<int> matchIds = new HashSet<int>(
+                matches.Rows
+                    .Cast<DataRow>()
+                    .Where(row => AreEqual(row["TournamentID"], tournamentId))
+                    .Select(row => Convert.ToInt32(row["MatchID"])));
+
+            RemoveRows(GetRequiredTable("Streams"), row =>
+                AreEqual(row["TournamentID"], tournamentId) ||
+                (row["MatchID"] != DBNull.Value && matchIds.Contains(Convert.ToInt32(row["MatchID"]))));
+            RemoveRows(matches, row => AreEqual(row["TournamentID"], tournamentId));
+            RemoveRows(GetRequiredTable("TournamentStages"), row => AreEqual(row["TournamentID"], tournamentId));
+            RemoveRows(GetRequiredTable("TournamentParticipants"), row => AreEqual(row["TournamentID"], tournamentId));
+            RemoveRows(GetRequiredTable("TournamentSponsors"), row => AreEqual(row["TournamentID"], tournamentId));
+            RemoveRows(GetRequiredTable("Tournaments"), row => AreEqual(row["TournamentID"], tournamentId));
+        }
+
+        private void DeleteTeamCascadeInternal(int teamId)
+        {
+            DataTable matches = GetRequiredTable("Matches");
+            HashSet<int> matchIds = new HashSet<int>(
+                matches.Rows
+                    .Cast<DataRow>()
+                    .Where(row =>
+                        AreEqual(row["Team1ID"], teamId) ||
+                        AreEqual(row["Team2ID"], teamId) ||
+                        AreEqual(row["WinnerTeamID"], teamId))
+                    .Select(row => Convert.ToInt32(row["MatchID"])));
+
+            RemoveRows(GetRequiredTable("Streams"), row =>
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+            RemoveRows(matches, row =>
+                AreEqual(row["Team1ID"], teamId) ||
+                AreEqual(row["Team2ID"], teamId) ||
+                AreEqual(row["WinnerTeamID"], teamId));
+            RemoveRows(GetRequiredTable("TournamentParticipants"), row => AreEqual(row["TeamID"], teamId));
+            RemoveRows(GetRequiredTable("TeamPlayers"), row => AreEqual(row["TeamID"], teamId));
+            RemoveRows(GetRequiredTable("Teams"), row => AreEqual(row["TeamID"], teamId));
+        }
+
+        private void DeletePlayerCascadeInternal(int playerId)
+        {
+            DataTable matches = GetRequiredTable("Matches");
+            HashSet<int> matchIds = new HashSet<int>(
+                matches.Rows
+                    .Cast<DataRow>()
+                    .Where(row =>
+                        AreEqual(row["Player1ID"], playerId) ||
+                        AreEqual(row["Player2ID"], playerId) ||
+                        AreEqual(row["WinnerPlayerID"], playerId))
+                    .Select(row => Convert.ToInt32(row["MatchID"])));
+
+            RemoveRows(GetRequiredTable("Streams"), row =>
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+            RemoveRows(matches, row =>
+                AreEqual(row["Player1ID"], playerId) ||
+                AreEqual(row["Player2ID"], playerId) ||
+                AreEqual(row["WinnerPlayerID"], playerId));
+            RemoveRows(GetRequiredTable("TournamentParticipants"), row => AreEqual(row["PlayerID"], playerId));
+            RemoveRows(GetRequiredTable("TeamPlayers"), row => AreEqual(row["PlayerID"], playerId));
+            RemoveRows(GetRequiredTable("Players"), row => AreEqual(row["PlayerID"], playerId));
+        }
+
+        private void DeleteGameCascadeInternal(int gameId)
+        {
+            List<int> tournamentIds = GetRequiredTable("Tournaments")
+                .Rows
+                .Cast<DataRow>()
+                .Where(row => AreEqual(row["GameID"], gameId))
+                .Select(row => Convert.ToInt32(row["TournamentID"]))
+                .ToList();
+
+            foreach (int tournamentId in tournamentIds)
+            {
+                DeleteTournamentCascadeInternal(tournamentId);
+            }
+
+            RemoveRows(GetRequiredTable("GameTitles"), row => AreEqual(row["GameID"], gameId));
+        }
+
+        private void DeleteSponsorCascadeInternal(int sponsorId)
+        {
+            RemoveRows(GetRequiredTable("TournamentSponsors"), row => AreEqual(row["SponsorID"], sponsorId));
+            RemoveRows(GetRequiredTable("Sponsors"), row => AreEqual(row["SponsorID"], sponsorId));
+        }
+
+        private void DeleteStageCascadeInternal(int stageId)
+        {
+            DataTable matches = GetRequiredTable("Matches");
+            HashSet<int> matchIds = new HashSet<int>(
+                matches.Rows
+                    .Cast<DataRow>()
+                    .Where(row => AreEqual(row["StageID"], stageId))
+                    .Select(row => Convert.ToInt32(row["MatchID"])));
+
+            RemoveRows(GetRequiredTable("Streams"), row =>
+                row["MatchID"] != DBNull.Value &&
+                matchIds.Contains(Convert.ToInt32(row["MatchID"])));
+            RemoveRows(matches, row => AreEqual(row["StageID"], stageId));
+            RemoveRows(GetRequiredTable("TournamentStages"), row => AreEqual(row["StageID"], stageId));
+        }
+
+        private void DeleteMatchCascadeInternal(int matchId)
+        {
+            RemoveRows(GetRequiredTable("Streams"), row => AreEqual(row["MatchID"], matchId));
+            RemoveRows(GetRequiredTable("Matches"), row => AreEqual(row["MatchID"], matchId));
+        }
+
+        private static int GetRequiredInt(IDictionary<string, object> values, string keyName)
+        {
+            if (values == null || string.IsNullOrWhiteSpace(keyName) || !values.ContainsKey(keyName) || values[keyName] == null || values[keyName] == DBNull.Value)
+            {
+                throw new InvalidOperationException("Не удалось определить ключ для каскадного удаления: " + keyName);
+            }
+
+            return Convert.ToInt32(values[keyName]);
         }
 
         private DataTable GetRequiredTable(string tableName)
