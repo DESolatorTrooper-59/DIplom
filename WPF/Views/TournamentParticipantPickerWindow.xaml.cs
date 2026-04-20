@@ -89,25 +89,20 @@ namespace Tournaments.WPF.Views
 
                 HashSet<int> registeredParticipantIds = new HashSet<int>(_registeredParticipants.Select(item => item.ParticipantId));
 
-                int registeredCount = _registeredParticipants.Count;
-                bool limitReached = _card.MaxParticipants > 0 && registeredCount >= _card.MaxParticipants;
-
-                _allAvailableParticipants = limitReached
-                    ? new List<AvailableParticipantViewModel>()
-                    : sourceTable.Rows
-                        .Cast<DataRow>()
-                        .Where(row =>
-                            row[sourceIdColumn] != DBNull.Value &&
-                            !registeredParticipantIds.Contains(Convert.ToInt32(row[sourceIdColumn])))
-                        .Select(row => new AvailableParticipantViewModel
-                        {
-                            ParticipantId = Convert.ToInt32(row[sourceIdColumn]),
-                            DisplayName = GetParticipantDisplayName(row),
-                            Details = BuildParticipantDetails(row),
-                            AddButtonText = IsPlayerMode ? "Добавить" : "Добавить команду"
-                        })
-                        .OrderBy(item => item.DisplayName)
-                        .ToList();
+                _allAvailableParticipants = sourceTable.Rows
+                    .Cast<DataRow>()
+                    .Where(row =>
+                        row[sourceIdColumn] != DBNull.Value &&
+                        !registeredParticipantIds.Contains(Convert.ToInt32(row[sourceIdColumn])))
+                    .Select(row => new AvailableParticipantViewModel
+                    {
+                        ParticipantId = Convert.ToInt32(row[sourceIdColumn]),
+                        DisplayName = GetParticipantDisplayName(row),
+                        Details = BuildParticipantDetails(row),
+                        AddButtonText = IsPlayerMode ? "Добавить" : "Добавить команду"
+                    })
+                    .OrderBy(item => item.DisplayName)
+                    .ToList();
 
                 ApplyFilter();
             }
@@ -159,6 +154,12 @@ namespace Tournaments.WPF.Views
             AvailableParticipantViewModel participant = (sender as FrameworkElement)?.DataContext as AvailableParticipantViewModel;
             if (participant == null)
             {
+                return;
+            }
+
+            if (_card.MaxParticipants > 0 && _registeredParticipants.Count >= _card.MaxParticipants)
+            {
+                MessageBox.Show(BuildLimitReachedMessage(), "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -264,11 +265,6 @@ namespace Tournaments.WPF.Views
 
         private string BuildAvailableEmptyText(string query)
         {
-            if (_card.MaxParticipants > 0 && _registeredParticipants.Count >= _card.MaxParticipants)
-            {
-                return "Лимит турнира достигнут. Чтобы добавить нового " + GetParticipantNameAccusative() + ", сначала удалите одного из текущих участников.";
-            }
-
             if (!string.IsNullOrWhiteSpace(query) && _allAvailableParticipants.Count > 0)
             {
                 return "По текущему запросу свободные " + GetParticipantsLabelPlural() + " не найдены.";
@@ -391,6 +387,11 @@ namespace Tournaments.WPF.Views
         private string GetParticipantsLabelGenitive()
         {
             return IsPlayerMode ? "игроков" : "команд";
+        }
+
+        private string BuildLimitReachedMessage()
+        {
+            return IsPlayerMode ? "Достигнут лимит участников." : "Достигнут лимит команд.";
         }
 
         private static Dictionary<string, object> ToDictionary(DataRow row)

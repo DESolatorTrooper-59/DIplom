@@ -214,13 +214,6 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            if (card.MaxParticipants > 0 && card.RegisteredParticipants >= card.MaxParticipants)
-            {
-                card.IsAdminManageParticipantsEnabled = false;
-                card.AdminManageParticipantsToolTip = "В турнире уже достигнут лимит участников.";
-                return;
-            }
-
             card.IsAdminManageParticipantsEnabled = true;
             card.AdminManageParticipantsToolTip = string.Equals(card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
                 ? "Открыть быстрый список игроков, которых можно добавить в турнир."
