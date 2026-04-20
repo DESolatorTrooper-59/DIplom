@@ -89,80 +89,6 @@
             </Canvas>
           </Viewbox>
         </Border>
-
-        <Button x:Name="TestModeButton"
-                Width="60"
-                Height="46"
-                Margin="8,0,0,0"
-                Style="{StaticResource FlatIconButtonStyle}"
-                Click="TestModeButton_Click"
-                ToolTip="Переключиться на тестовый режим.">
-          <Border x:Name="TestModeBadge"
-                  Padding="8"
-                  Background="{DynamicResource BadgeBackgroundBrush}"
-                  BorderBrush="{DynamicResource BadgeBorderBrush}"
-                  BorderThickness="1"
-                  CornerRadius="16">
-            <Viewbox Stretch="Uniform">
-              <Canvas Width="44" Height="28">
-                <Line x:Name="RobotAntenna"
-                      X1="22"
-                      Y1="3"
-                      X2="22"
-                      Y2="7"
-                      StrokeThickness="2"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" />
-                <Ellipse x:Name="RobotAntennaTip"
-                         Width="4"
-                         Height="4"
-                         Canvas.Left="20"
-                         Canvas.Top="0" />
-                <Rectangle x:Name="RobotHead"
-                           Width="20"
-                           Height="14"
-                           RadiusX="4"
-                           RadiusY="4"
-                           StrokeThickness="2"
-                           Canvas.Left="12"
-                           Canvas.Top="7" />
-                <Ellipse x:Name="RobotEyeLeft"
-                         Width="3"
-                         Height="3"
-                         Canvas.Left="17"
-                         Canvas.Top="12" />
-                <Ellipse x:Name="RobotEyeRight"
-                         Width="3"
-                         Height="3"
-                         Canvas.Left="24"
-                         Canvas.Top="12" />
-                <Rectangle x:Name="RobotMouth"
-                           Width="8"
-                           Height="2.5"
-                           RadiusX="1"
-                           RadiusY="1"
-                           Canvas.Left="18"
-                           Canvas.Top="17" />
-                <Line x:Name="RobotArmLeft"
-                      X1="12"
-                      Y1="14"
-                      X2="7"
-                      Y2="18"
-                      StrokeThickness="2"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" />
-                <Line x:Name="RobotArmRight"
-                      X1="32"
-                      Y1="14"
-                      X2="37"
-                      Y2="18"
-                      StrokeThickness="2"
-                      StrokeStartLineCap="Round"
-                      StrokeEndLineCap="Round" />
-              </Canvas>
-            </Viewbox>
-          </Border>
-        </Button>
       </StackPanel>
 
       <Button Grid.Column="2"
@@ -214,7 +140,7 @@
                      Foreground="{DynamicResource TextPrimaryBrush}" />
           <TextBlock x:Name="SubtitleText"
                      Margin="0,8,0,0"
-                     Text="Войдите как администратор или игрок, либо откройте приложение в режиме гостя."
+                     Text="Подключитесь к MS SQL Server и войдите как администратор, игрок или гость."
                      TextWrapping="Wrap"
                      Foreground="{DynamicResource TextSecondaryBrush}" />
         </StackPanel>

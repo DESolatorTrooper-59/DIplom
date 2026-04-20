@@ -19,11 +19,6 @@ namespace Tournaments.WPF.Services
             _backend = backend ?? throw new ArgumentNullException(nameof(backend));
         }
 
-        public static DatabaseService CreateInMemory()
-        {
-            return new DatabaseService(new InMemoryDataBackend(InMemoryDataStore.Instance));
-        }
-
         public static DatabaseService CreateSqlServer(string connectionString, string storageLabel)
         {
             return new DatabaseService(new SqlServerDataBackend(connectionString, storageLabel));
