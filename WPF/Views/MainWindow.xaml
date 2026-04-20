@@ -11,7 +11,7 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <Border Grid.Column="0" Background="{DynamicResource PanelBrush}">
+    <Border Grid.Column="0" Background="{DynamicResource SidebarPanelBrush}">
       <DockPanel Margin="20">
         <Grid DockPanel.Dock="Top" Margin="0,0,0,24">
           <Grid.RowDefinitions>
@@ -83,7 +83,7 @@
         <ListBox x:Name="EntitiesList"
                  Background="Transparent"
                  BorderThickness="0"
-                 Foreground="{DynamicResource PanelTextBrush}"
+                 Foreground="{DynamicResource SidebarTextBrush}"
                  ItemContainerStyle="{DynamicResource SidebarNavigationItemStyle}"
                  SelectionChanged="EntitiesList_SelectionChanged">
         </ListBox>
