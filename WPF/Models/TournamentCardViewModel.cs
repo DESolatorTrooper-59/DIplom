@@ -53,11 +53,13 @@ namespace Tournaments.WPF.Models
 
         public Visibility SettingsButtonVisibility { get; set; }
 
-        public Visibility AdminAddPlayersVisibility { get; set; }
+        public Visibility AdminManageParticipantsVisibility { get; set; }
 
-        public bool IsAdminAddPlayersEnabled { get; set; }
+        public bool IsAdminManageParticipantsEnabled { get; set; }
 
-        public string AdminAddPlayersToolTip { get; set; }
+        public string AdminManageParticipantsToolTip { get; set; }
+
+        public string AdminManageParticipantsButtonText { get; set; }
 
         public bool IsRegisterEnabled { get; set; }
 

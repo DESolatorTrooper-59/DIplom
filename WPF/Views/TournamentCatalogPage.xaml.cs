@@ -143,10 +143,12 @@ namespace Tournaments.WPF.Views
                 PreviewPlaceholderVisibility = previewImage == null ? Visibility.Visible : Visibility.Collapsed,
                 RegisterButtonVisibility = _currentRole == UserRole.Player ? Visibility.Visible : Visibility.Collapsed,
                 SettingsButtonVisibility = _currentRole == UserRole.Administrator ? Visibility.Visible : Visibility.Collapsed,
-                AdminAddPlayersVisibility = _currentRole == UserRole.Administrator &&
-                                            string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
+                AdminManageParticipantsVisibility = _currentRole == UserRole.Administrator
                     ? Visibility.Visible
                     : Visibility.Collapsed,
+                AdminManageParticipantsButtonText = string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
+                    ? "Добавить участников"
+                    : "Добавить команды",
                 IsRegistered = isRegistered,
                 OriginalValues = ToDictionary(row)
             };
@@ -205,23 +207,24 @@ namespace Tournaments.WPF.Views
 
         private void ConfigureAdminActions(TournamentCardViewModel card)
         {
-            if (_currentRole != UserRole.Administrator ||
-                !string.Equals(card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase))
+            if (_currentRole != UserRole.Administrator)
             {
-                card.IsAdminAddPlayersEnabled = false;
-                card.AdminAddPlayersToolTip = string.Empty;
+                card.IsAdminManageParticipantsEnabled = false;
+                card.AdminManageParticipantsToolTip = string.Empty;
                 return;
             }
 
             if (card.MaxParticipants > 0 && card.RegisteredParticipants >= card.MaxParticipants)
             {
-                card.IsAdminAddPlayersEnabled = false;
-                card.AdminAddPlayersToolTip = "В турнире уже достигнут лимит участников.";
+                card.IsAdminManageParticipantsEnabled = false;
+                card.AdminManageParticipantsToolTip = "В турнире уже достигнут лимит участников.";
                 return;
             }
 
-            card.IsAdminAddPlayersEnabled = true;
-            card.AdminAddPlayersToolTip = "Открыть быстрый список игроков, которых можно добавить в турнир.";
+            card.IsAdminManageParticipantsEnabled = true;
+            card.AdminManageParticipantsToolTip = string.Equals(card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
+                ? "Открыть быстрый список игроков, которых можно добавить в турнир."
+                : "Открыть быстрый список команд, которые можно добавить в турнир.";
         }
 
         private void ApplyFilter()
@@ -256,7 +259,7 @@ namespace Tournaments.WPF.Views
         {
             try
             {
-                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, null)
+                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, null, _database)
                 {
                     Owner = Window.GetWindow(this)
                 };
@@ -382,7 +385,7 @@ namespace Tournaments.WPF.Views
         {
             try
             {
-                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, card.OriginalValues)
+                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, card.OriginalValues, _database)
                 {
                     Owner = Window.GetWindow(this)
                 };

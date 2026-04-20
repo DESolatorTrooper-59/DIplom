@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using Tournaments.WPF.Models;
+using Tournaments.WPF.Services;
 
 namespace Tournaments.WPF.Views
 {
@@ -11,14 +14,17 @@ namespace Tournaments.WPF.Views
     {
         private readonly EntityDefinition _definition;
         private readonly IDictionary<string, object> _originalValues;
+        private readonly DatabaseService _database;
         private readonly bool _isInsert;
         private readonly Dictionary<string, FrameworkElement> _controls = new Dictionary<string, FrameworkElement>();
+        private readonly Dictionary<string, IReadOnlyList<LookupOption>> _lookupOptions = new Dictionary<string, IReadOnlyList<LookupOption>>(StringComparer.OrdinalIgnoreCase);
 
-        public EditEntityWindow(EntityDefinition definition, IDictionary<string, object> originalValues)
+        public EditEntityWindow(EntityDefinition definition, IDictionary<string, object> originalValues, DatabaseService database)
         {
             InitializeComponent();
             _definition = definition;
             _originalValues = originalValues;
+            _database = database ?? throw new ArgumentNullException(nameof(database));
             _isInsert = originalValues == null;
             TitleText.Text = (_isInsert ? "Добавление" : "Редактирование") + ": " + _definition.Title;
             BuildForm();
@@ -55,6 +61,17 @@ namespace Tournaments.WPF.Views
             if (field.IsReadOnly || field.IsIdentity)
             {
                 return new TextBox { IsReadOnly = true, IsEnabled = false };
+            }
+
+            if (!string.IsNullOrWhiteSpace(field.LookupTableName) && !string.IsNullOrWhiteSpace(field.LookupColumnName))
+            {
+                ComboBox lookupComboBox = new ComboBox
+                {
+                    ItemsSource = GetLookupOptions(field),
+                    DisplayMemberPath = nameof(LookupOption.Display),
+                    SelectedValuePath = nameof(LookupOption.Value)
+                };
+                return lookupComboBox;
             }
 
             switch (field.Type)
@@ -108,7 +125,14 @@ namespace Tournaments.WPF.Views
             }
             else if (control is ComboBox comboBox)
             {
-                comboBox.SelectedItem = Convert.ToString(value, CultureInfo.CurrentCulture);
+                if (!string.IsNullOrWhiteSpace(field.LookupTableName) && !string.IsNullOrWhiteSpace(field.LookupColumnName))
+                {
+                    comboBox.SelectedValue = value;
+                }
+                else
+                {
+                    comboBox.SelectedItem = Convert.ToString(value, CultureInfo.CurrentCulture);
+                }
             }
         }
 
@@ -167,6 +191,12 @@ namespace Tournaments.WPF.Views
             string rawText;
             if (control is ComboBox comboBox)
             {
+                if (!string.IsNullOrWhiteSpace(field.LookupTableName) && !string.IsNullOrWhiteSpace(field.LookupColumnName))
+                {
+                    value = comboBox.SelectedValue;
+                    return true;
+                }
+
                 rawText = Convert.ToString(comboBox.SelectedItem);
             }
             else
@@ -237,6 +267,80 @@ namespace Tournaments.WPF.Views
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
+        }
+
+        private IReadOnlyList<LookupOption> GetLookupOptions(FieldDefinition field)
+        {
+            string cacheKey = BuildLookupCacheKey(field);
+            if (_lookupOptions.TryGetValue(cacheKey, out IReadOnlyList<LookupOption> cachedOptions))
+            {
+                return cachedOptions;
+            }
+
+            if (string.IsNullOrWhiteSpace(field.LookupTableName) || string.IsNullOrWhiteSpace(field.LookupColumnName))
+            {
+                return Array.Empty<LookupOption>();
+            }
+
+            try
+            {
+                DataTable lookupTable = _database.GetTable(field.LookupTableName);
+                if (!lookupTable.Columns.Contains(field.LookupColumnName))
+                {
+                    return Array.Empty<LookupOption>();
+                }
+
+                string displayColumnName = !string.IsNullOrWhiteSpace(field.LookupDisplayColumnName) && lookupTable.Columns.Contains(field.LookupDisplayColumnName)
+                    ? field.LookupDisplayColumnName
+                    : null;
+
+                List<LookupOption> options = lookupTable.Rows
+                    .Cast<DataRow>()
+                    .Where(row => row[field.LookupColumnName] != DBNull.Value)
+                    .OrderBy(row => Convert.ToString(row[field.LookupColumnName], CultureInfo.CurrentCulture))
+                    .Select(row => new LookupOption(
+                        row[field.LookupColumnName],
+                        BuildLookupDisplayText(row, field.LookupColumnName, displayColumnName)))
+                    .ToList();
+
+                if (!field.IsRequired)
+                {
+                    options.Insert(0, new LookupOption(null, string.Empty));
+                }
+
+                _lookupOptions[cacheKey] = options;
+                return options;
+            }
+            catch
+            {
+                return Array.Empty<LookupOption>();
+            }
+        }
+
+        private static string BuildLookupCacheKey(FieldDefinition field)
+        {
+            return string.Join("|",
+                field.LookupTableName ?? string.Empty,
+                field.LookupColumnName ?? string.Empty,
+                field.LookupDisplayColumnName ?? string.Empty,
+                field.IsRequired.ToString());
+        }
+
+        private static string BuildLookupDisplayText(DataRow row, string valueColumnName, string displayColumnName)
+        {
+            string valueText = Convert.ToString(row[valueColumnName], CultureInfo.CurrentCulture);
+            if (string.IsNullOrWhiteSpace(displayColumnName) || row[displayColumnName] == DBNull.Value)
+            {
+                return valueText;
+            }
+
+            string displayText = Convert.ToString(row[displayColumnName], CultureInfo.CurrentCulture);
+            if (string.IsNullOrWhiteSpace(displayText) || string.Equals(displayText, valueText, StringComparison.CurrentCultureIgnoreCase))
+            {
+                return valueText;
+            }
+
+            return valueText + " - " + displayText;
         }
     }
 }

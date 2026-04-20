@@ -14,8 +14,8 @@ namespace Tournaments.WPF.Views
         private readonly DatabaseService _database;
         private readonly EntityDefinition _participantsDefinition;
         private readonly TournamentCardViewModel _card;
-        private List<AvailablePlayerViewModel> _allPlayers = new List<AvailablePlayerViewModel>();
-        private List<RegisteredPlayerViewModel> _registeredPlayers = new List<RegisteredPlayerViewModel>();
+        private List<AvailableParticipantViewModel> _allAvailableParticipants = new List<AvailableParticipantViewModel>();
+        private List<RegisteredParticipantViewModel> _registeredParticipants = new List<RegisteredParticipantViewModel>();
 
         public TournamentParticipantPickerWindow(DatabaseService database, EntityDefinition participantsDefinition, TournamentCardViewModel card)
         {
@@ -24,38 +24,51 @@ namespace Tournaments.WPF.Views
             _participantsDefinition = participantsDefinition ?? throw new ArgumentNullException(nameof(participantsDefinition));
             _card = card ?? throw new ArgumentNullException(nameof(card));
 
-            Title = "Управление участниками";
-            TitleText.Text = "Управление участниками";
-            SubtitleText.Text = "Добавляйте свободных игроков и удаляйте текущих участников турнира \"" + _card.TournamentName + "\" прямо из этого окна.";
+            Title = IsPlayerMode ? "Управление участниками" : "Управление командами";
+            TitleText.Text = IsPlayerMode ? "Управление участниками" : "Управление командами";
+            SubtitleText.Text = IsPlayerMode
+                ? "Добавляйте свободных игроков и удаляйте текущих участников турнира \"" + _card.TournamentName + "\" прямо из этого окна."
+                : "Добавляйте свободные команды и удаляйте текущих участников турнира \"" + _card.TournamentName + "\" прямо из этого окна.";
+            SearchHintText.Text = IsPlayerMode
+                ? "Поиск по нику, имени или стране"
+                : "Поиск по названию, тренеру или стране";
+            RegisteredSectionTitleText.Text = IsPlayerMode ? "Участники турнира" : "Команды турнира";
+            RegisteredHintText.Text = IsPlayerMode
+                ? "Удаление выполняется по крестику справа от участника."
+                : "Удаление выполняется по крестику справа от команды.";
+            AvailableSectionTitleText.Text = IsPlayerMode ? "Можно добавить" : "Можно добавить команды";
             Loaded += TournamentParticipantPickerWindow_Loaded;
         }
 
         public bool HasChanges { get; private set; }
 
+        private bool IsPlayerMode
+        {
+            get
+            {
+                return string.Equals(_card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase);
+            }
+        }
+
         private void TournamentParticipantPickerWindow_Loaded(object sender, RoutedEventArgs e)
         {
             Loaded -= TournamentParticipantPickerWindow_Loaded;
-            LoadPlayers();
+            LoadParticipants();
         }
 
-        private void LoadPlayers()
+        private void LoadParticipants()
         {
             try
             {
-                if (!string.Equals(_card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase))
-                {
-                    _registeredPlayers = new List<RegisteredPlayerViewModel>();
-                    _allPlayers = new List<AvailablePlayerViewModel>();
-                    ApplyFilter();
-                    return;
-                }
-
-                DataTable players = _database.GetTable("Players");
                 DataTable participants = _database.GetTable("TournamentParticipants");
-                Dictionary<int, DataRow> playersById = players.Rows
+                DataTable sourceTable = _database.GetTable(IsPlayerMode ? "Players" : "Teams");
+                string sourceIdColumn = IsPlayerMode ? "PlayerID" : "TeamID";
+                string participantColumn = IsPlayerMode ? "PlayerID" : "TeamID";
+
+                Dictionary<int, DataRow> participantsById = sourceTable.Rows
                     .Cast<DataRow>()
-                    .Where(row => row["PlayerID"] != DBNull.Value)
-                    .GroupBy(row => Convert.ToInt32(row["PlayerID"]))
+                    .Where(row => row[sourceIdColumn] != DBNull.Value)
+                    .GroupBy(row => Convert.ToInt32(row[sourceIdColumn]))
                     .ToDictionary(group => group.Key, group => group.First());
 
                 List<DataRow> participantRows = participants.Rows
@@ -63,45 +76,46 @@ namespace Tournaments.WPF.Views
                     .Where(row =>
                         row["TournamentID"] != DBNull.Value &&
                         Convert.ToInt32(row["TournamentID"]) == _card.TournamentId &&
-                        row.Table.Columns.Contains("PlayerID") &&
-                        row["PlayerID"] != DBNull.Value)
+                        row.Table.Columns.Contains(participantColumn) &&
+                        row[participantColumn] != DBNull.Value)
                     .ToList();
 
-                _registeredPlayers = participantRows
-                    .Select(row => BuildRegisteredPlayer(row, playersById))
-                    .OrderBy(player => player.Seed.HasValue ? 0 : 1)
-                    .ThenBy(player => player.Seed ?? int.MaxValue)
-                    .ThenBy(player => player.Nickname)
+                _registeredParticipants = participantRows
+                    .Select(row => BuildRegisteredParticipant(row, participantsById))
+                    .OrderBy(item => item.Seed.HasValue ? 0 : 1)
+                    .ThenBy(item => item.Seed ?? int.MaxValue)
+                    .ThenBy(item => item.DisplayName)
                     .ToList();
 
-                HashSet<int> registeredPlayerIds = new HashSet<int>(_registeredPlayers.Select(player => player.PlayerId));
+                HashSet<int> registeredParticipantIds = new HashSet<int>(_registeredParticipants.Select(item => item.ParticipantId));
 
-                int registeredCount = _registeredPlayers.Count;
+                int registeredCount = _registeredParticipants.Count;
                 bool limitReached = _card.MaxParticipants > 0 && registeredCount >= _card.MaxParticipants;
 
-                _allPlayers = limitReached
-                    ? new List<AvailablePlayerViewModel>()
-                    : players.Rows
+                _allAvailableParticipants = limitReached
+                    ? new List<AvailableParticipantViewModel>()
+                    : sourceTable.Rows
                         .Cast<DataRow>()
                         .Where(row =>
-                            row["PlayerID"] != DBNull.Value &&
-                            !registeredPlayerIds.Contains(Convert.ToInt32(row["PlayerID"])))
-                        .Select(row => new AvailablePlayerViewModel
+                            row[sourceIdColumn] != DBNull.Value &&
+                            !registeredParticipantIds.Contains(Convert.ToInt32(row[sourceIdColumn])))
+                        .Select(row => new AvailableParticipantViewModel
                         {
-                            PlayerId = Convert.ToInt32(row["PlayerID"]),
-                            Nickname = Convert.ToString(row["Nickname"]),
-                            Details = BuildPlayerDetails(row)
+                            ParticipantId = Convert.ToInt32(row[sourceIdColumn]),
+                            DisplayName = GetParticipantDisplayName(row),
+                            Details = BuildParticipantDetails(row),
+                            AddButtonText = IsPlayerMode ? "Добавить" : "Добавить команду"
                         })
-                        .OrderBy(player => player.Nickname)
+                        .OrderBy(item => item.DisplayName)
                         .ToList();
 
                 ApplyFilter();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Не удалось загрузить список игроков: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
-                _registeredPlayers = new List<RegisteredPlayerViewModel>();
-                _allPlayers = new List<AvailablePlayerViewModel>();
+                MessageBox.Show("Не удалось загрузить список " + GetParticipantsLabelGenitive() + ": " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _registeredParticipants = new List<RegisteredParticipantViewModel>();
+                _allAvailableParticipants = new List<AvailableParticipantViewModel>();
                 ApplyFilter();
             }
         }
@@ -109,21 +123,21 @@ namespace Tournaments.WPF.Views
         private void ApplyFilter()
         {
             string query = SearchTextBox.Text == null ? string.Empty : SearchTextBox.Text.Trim();
-            List<RegisteredPlayerViewModel> filteredRegistered = string.IsNullOrWhiteSpace(query)
-                ? _registeredPlayers
-                : _registeredPlayers
-                    .Where(player =>
-                        Contains(player.Nickname, query) ||
-                        Contains(player.Details, query) ||
-                        Contains(player.SeedText, query))
+            List<RegisteredParticipantViewModel> filteredRegistered = string.IsNullOrWhiteSpace(query)
+                ? _registeredParticipants
+                : _registeredParticipants
+                    .Where(item =>
+                        Contains(item.DisplayName, query) ||
+                        Contains(item.Details, query) ||
+                        Contains(item.SeedText, query))
                     .ToList();
 
-            List<AvailablePlayerViewModel> filteredAvailable = string.IsNullOrWhiteSpace(query)
-                ? _allPlayers
-                : _allPlayers
-                    .Where(player =>
-                        Contains(player.Nickname, query) ||
-                        Contains(player.Details, query))
+            List<AvailableParticipantViewModel> filteredAvailable = string.IsNullOrWhiteSpace(query)
+                ? _allAvailableParticipants
+                : _allAvailableParticipants
+                    .Where(item =>
+                        Contains(item.DisplayName, query) ||
+                        Contains(item.Details, query))
                     .ToList();
 
             RegisteredPlayersItemsControl.ItemsSource = filteredRegistered;
@@ -140,10 +154,10 @@ namespace Tournaments.WPF.Views
             AvailableEmptyText.Text = BuildAvailableEmptyText(query);
         }
 
-        private void Player_Click(object sender, RoutedEventArgs e)
+        private void AddParticipant_Click(object sender, RoutedEventArgs e)
         {
-            AvailablePlayerViewModel player = (sender as FrameworkElement)?.DataContext as AvailablePlayerViewModel;
-            if (player == null)
+            AvailableParticipantViewModel participant = (sender as FrameworkElement)?.DataContext as AvailableParticipantViewModel;
+            if (participant == null)
             {
                 return;
             }
@@ -153,9 +167,9 @@ namespace Tournaments.WPF.Views
                 Dictionary<string, object> values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["TournamentID"] = _card.TournamentId,
-                    ["PlayerID"] = player.PlayerId,
                     ["Seed"] = GetNextSeed(_card.TournamentId)
                 };
+                values[IsPlayerMode ? "PlayerID" : "TeamID"] = participant.ParticipantId;
 
                 EntityEditContext context = new EntityEditContext(true, values, null, _database);
                 EntityValidationResult validation = _participantsDefinition.SaveValidator == null
@@ -165,31 +179,31 @@ namespace Tournaments.WPF.Views
                 if (!validation.IsValid)
                 {
                     MessageBox.Show(validation.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    LoadPlayers();
+                    LoadParticipants();
                     return;
                 }
 
                 _database.Insert("TournamentParticipants", values);
                 HasChanges = true;
-                LoadPlayers();
+                LoadParticipants();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Не удалось добавить игрока: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
-                LoadPlayers();
+                MessageBox.Show("Не удалось добавить " + GetParticipantNameAccusative() + ": " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                LoadParticipants();
             }
         }
 
-        private void RemovePlayer_Click(object sender, RoutedEventArgs e)
+        private void RemoveParticipant_Click(object sender, RoutedEventArgs e)
         {
-            RegisteredPlayerViewModel player = (sender as FrameworkElement)?.DataContext as RegisteredPlayerViewModel;
-            if (player == null)
+            RegisteredParticipantViewModel participant = (sender as FrameworkElement)?.DataContext as RegisteredParticipantViewModel;
+            if (participant == null)
             {
                 return;
             }
 
             MessageBoxResult result = MessageBox.Show(
-                "Удалить игрока \"" + player.Nickname + "\" из турнира \"" + _card.TournamentName + "\"?",
+                "Удалить " + GetParticipantNameAccusative() + " \"" + participant.DisplayName + "\" из турнира \"" + _card.TournamentName + "\"?",
                 "Tournaments WPF",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -201,14 +215,14 @@ namespace Tournaments.WPF.Views
 
             try
             {
-                _database.Delete("TournamentParticipants", _participantsDefinition.KeyColumns, player.OriginalValues);
+                _database.Delete("TournamentParticipants", _participantsDefinition.KeyColumns, participant.OriginalValues);
                 HasChanges = true;
-                LoadPlayers();
+                LoadParticipants();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Не удалось удалить участника: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
-                LoadPlayers();
+                MessageBox.Show("Не удалось удалить " + GetParticipantNameAccusative() + ": " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                LoadParticipants();
             }
         }
 
@@ -240,59 +254,50 @@ namespace Tournaments.WPF.Views
 
         private string BuildRegisteredEmptyText(string query)
         {
-            if (!string.Equals(_card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(query) && _registeredParticipants.Count > 0)
             {
-                return "Быстрое управление доступно только для турниров с участниками-игроками.";
+                return "По текущему запросу " + GetParticipantsLabelPlural() + " не найдены.";
             }
 
-            if (!string.IsNullOrWhiteSpace(query) && _registeredPlayers.Count > 0)
-            {
-                return "По текущему запросу участники не найдены.";
-            }
-
-            return "В турнире пока нет добавленных игроков.";
+            return "В турнире пока нет добавленных " + GetParticipantsLabelGenitive() + ".";
         }
 
         private string BuildAvailableEmptyText(string query)
         {
-            if (!string.Equals(_card.ParticipantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase))
+            if (_card.MaxParticipants > 0 && _registeredParticipants.Count >= _card.MaxParticipants)
             {
-                return "Для командных турниров используйте общий список участников.";
+                return "Лимит турнира достигнут. Чтобы добавить нового " + GetParticipantNameAccusative() + ", сначала удалите одного из текущих участников.";
             }
 
-            if (_card.MaxParticipants > 0 && _registeredPlayers.Count >= _card.MaxParticipants)
+            if (!string.IsNullOrWhiteSpace(query) && _allAvailableParticipants.Count > 0)
             {
-                return "Лимит турнира достигнут. Чтобы добавить нового игрока, сначала удалите одного из текущих участников.";
+                return "По текущему запросу свободные " + GetParticipantsLabelPlural() + " не найдены.";
             }
 
-            if (!string.IsNullOrWhiteSpace(query) && _allPlayers.Count > 0)
-            {
-                return "По текущему запросу свободные игроки не найдены.";
-            }
-
-            return "Свободных игроков для добавления не осталось.";
+            return "Свободных " + GetParticipantsLabelGenitive() + " для добавления не осталось.";
         }
 
         private string BuildSummaryText(int visibleRegisteredCount, int visibleAvailableCount)
         {
+            string participantsLabel = IsPlayerMode ? "игроков" : "команд";
             if (_card.MaxParticipants > 0)
             {
-                return "Участников в турнире: " + visibleRegisteredCount + ". Доступно для добавления: " + visibleAvailableCount + ". Лимит: " + _card.MaxParticipants + ".";
+                return "Участников в турнире: " + visibleRegisteredCount + " " + participantsLabel + ". Доступно для добавления: " + visibleAvailableCount + ". Лимит: " + _card.MaxParticipants + ".";
             }
 
-            return "Участников в турнире: " + visibleRegisteredCount + ". Доступно для добавления: " + visibleAvailableCount + ".";
+            return "Участников в турнире: " + visibleRegisteredCount + " " + participantsLabel + ". Доступно для добавления: " + visibleAvailableCount + ".";
         }
 
-        private static string BuildPlayerDetails(DataRow row)
+        private string BuildParticipantDetails(DataRow row)
         {
             if (row == null)
             {
-                return "Игрок без дополнительных данных";
+                return IsPlayerMode ? "Игрок без дополнительных данных" : "Команда без дополнительных данных";
             }
 
             List<string> parts = new List<string>();
 
-            if (row.Table.Columns.Contains("RealName") && row["RealName"] != DBNull.Value)
+            if (IsPlayerMode && row.Table.Columns.Contains("RealName") && row["RealName"] != DBNull.Value)
             {
                 string realName = Convert.ToString(row["RealName"]);
                 if (!string.IsNullOrWhiteSpace(realName))
@@ -310,7 +315,18 @@ namespace Tournaments.WPF.Views
                 }
             }
 
-            return parts.Count == 0 ? "Игрок без дополнительных данных" : string.Join(" | ", parts);
+            if (!IsPlayerMode && row.Table.Columns.Contains("CoachName") && row["CoachName"] != DBNull.Value)
+            {
+                string coachName = Convert.ToString(row["CoachName"]);
+                if (!string.IsNullOrWhiteSpace(coachName))
+                {
+                    parts.Add("Тренер: " + coachName);
+                }
+            }
+
+            return parts.Count == 0
+                ? (IsPlayerMode ? "Игрок без дополнительных данных" : "Команда без дополнительных данных")
+                : string.Join(" | ", parts);
         }
 
         private static bool Contains(string source, string query)
@@ -320,28 +336,61 @@ namespace Tournaments.WPF.Views
                    source.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0;
         }
 
-        private RegisteredPlayerViewModel BuildRegisteredPlayer(DataRow participantRow, IReadOnlyDictionary<int, DataRow> playersById)
+        private RegisteredParticipantViewModel BuildRegisteredParticipant(DataRow participantRow, IReadOnlyDictionary<int, DataRow> participantsById)
         {
-            int playerId = Convert.ToInt32(participantRow["PlayerID"]);
-            playersById.TryGetValue(playerId, out DataRow playerRow);
-
-            string nickname = playerRow != null && playerRow.Table.Columns.Contains("Nickname") && playerRow["Nickname"] != DBNull.Value
-                ? Convert.ToString(playerRow["Nickname"])
-                : "Игрок #" + playerId;
+            string participantColumn = IsPlayerMode ? "PlayerID" : "TeamID";
+            int participantId = Convert.ToInt32(participantRow[participantColumn]);
+            participantsById.TryGetValue(participantId, out DataRow participantRowData);
 
             int? seed = participantRow.Table.Columns.Contains("Seed") && participantRow["Seed"] != DBNull.Value
                 ? (int?)Convert.ToInt32(participantRow["Seed"])
                 : null;
 
-            return new RegisteredPlayerViewModel
+            return new RegisteredParticipantViewModel
             {
                 ParticipationId = Convert.ToInt32(participantRow["ParticipationID"]),
-                PlayerId = playerId,
-                Nickname = nickname,
-                Details = BuildPlayerDetails(playerRow),
+                ParticipantId = participantId,
+                DisplayName = GetParticipantDisplayName(participantRowData, participantId),
+                Details = BuildParticipantDetails(participantRowData),
                 Seed = seed,
+                RemoveToolTip = "Удалить " + GetParticipantNameAccusative() + " из турнира",
                 OriginalValues = ToDictionary(participantRow)
             };
+        }
+
+        private string GetParticipantDisplayName(DataRow row, int fallbackId = 0)
+        {
+            if (row == null)
+            {
+                return (IsPlayerMode ? "Игрок #" : "Команда #") + fallbackId;
+            }
+
+            string preferredColumn = IsPlayerMode ? "Nickname" : "TeamName";
+            if (row.Table.Columns.Contains(preferredColumn) && row[preferredColumn] != DBNull.Value)
+            {
+                string value = Convert.ToString(row[preferredColumn]);
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    return value;
+                }
+            }
+
+            return (IsPlayerMode ? "Игрок #" : "Команда #") + fallbackId;
+        }
+
+        private string GetParticipantNameAccusative()
+        {
+            return IsPlayerMode ? "игрока" : "команду";
+        }
+
+        private string GetParticipantsLabelPlural()
+        {
+            return IsPlayerMode ? "игроки" : "команды";
+        }
+
+        private string GetParticipantsLabelGenitive()
+        {
+            return IsPlayerMode ? "игроков" : "команд";
         }
 
         private static Dictionary<string, object> ToDictionary(DataRow row)
@@ -356,26 +405,30 @@ namespace Tournaments.WPF.Views
             return values;
         }
 
-        private sealed class AvailablePlayerViewModel
+        private sealed class AvailableParticipantViewModel
         {
-            public int PlayerId { get; set; }
+            public int ParticipantId { get; set; }
 
-            public string Nickname { get; set; }
+            public string DisplayName { get; set; }
 
             public string Details { get; set; }
+
+            public string AddButtonText { get; set; }
         }
 
-        private sealed class RegisteredPlayerViewModel
+        private sealed class RegisteredParticipantViewModel
         {
             public int ParticipationId { get; set; }
 
-            public int PlayerId { get; set; }
+            public int ParticipantId { get; set; }
 
-            public string Nickname { get; set; }
+            public string DisplayName { get; set; }
 
             public string Details { get; set; }
 
             public int? Seed { get; set; }
+
+            public string RemoveToolTip { get; set; }
 
             public string SeedText
             {

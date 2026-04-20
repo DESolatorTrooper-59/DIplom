@@ -40,11 +40,11 @@
                  Height="40"
                  VerticalContentAlignment="Center"
                  TextChanged="SearchTextBox_TextChanged" />
-        <TextBlock Margin="12,0,0,0"
+        <TextBlock x:Name="SearchHintText"
+                   Margin="12,0,0,0"
                    VerticalAlignment="Center"
                    Foreground="{DynamicResource TextMutedBrush}"
-                   IsHitTestVisible="False"
-                   Text="Поиск по нику, имени или стране">
+                   IsHitTestVisible="False">
           <TextBlock.Style>
             <Style TargetType="TextBlock">
               <Setter Property="Visibility" Value="Collapsed" />
@@ -83,8 +83,8 @@
             <StackPanel>
               <DockPanel LastChildFill="False">
                 <TextBlock DockPanel.Dock="Left"
+                           x:Name="RegisteredSectionTitleText"
                            VerticalAlignment="Center"
-                           Text="Участники турнира"
                            FontSize="20"
                            FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -101,8 +101,8 @@
               </DockPanel>
 
               <TextBlock Margin="0,10,0,0"
+                         x:Name="RegisteredHintText"
                          Foreground="{DynamicResource TextSecondaryBrush}"
-                         Text="Удаление выполняется по крестику справа от участника."
                          TextWrapping="Wrap" />
 
               <ItemsControl x:Name="RegisteredPlayersItemsControl"
@@ -123,7 +123,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel>
-                          <TextBlock Text="{Binding Nickname}"
+                          <TextBlock Text="{Binding DisplayName}"
                                      FontSize="18"
                                      FontWeight="Bold"
                                      Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -154,8 +154,8 @@
                                 FontSize="18"
                                 FontWeight="Bold"
                                 Content="×"
-                                ToolTip="Удалить участника из турнира"
-                                Click="RemovePlayer_Click" />
+                                ToolTip="{Binding RemoveToolTip}"
+                                Click="RemoveParticipant_Click" />
                       </Grid>
                     </Border>
                   </DataTemplate>
@@ -178,8 +178,8 @@
             <StackPanel>
               <DockPanel LastChildFill="False">
                 <TextBlock DockPanel.Dock="Left"
+                           x:Name="AvailableSectionTitleText"
                            VerticalAlignment="Center"
-                           Text="Можно добавить"
                            FontSize="20"
                            FontWeight="Bold"
                            Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -205,7 +205,7 @@
                             Background="{DynamicResource CardBrush}"
                             BorderBrush="{DynamicResource BorderBrush}"
                             BorderThickness="1"
-                            Click="Player_Click">
+                            Click="AddParticipant_Click">
                       <Grid>
                         <Grid.ColumnDefinitions>
                           <ColumnDefinition Width="*" />
@@ -213,7 +213,7 @@
                         </Grid.ColumnDefinitions>
 
                         <StackPanel>
-                          <TextBlock Text="{Binding Nickname}"
+                          <TextBlock Text="{Binding DisplayName}"
                                      FontSize="20"
                                      FontWeight="Bold"
                                      Foreground="{DynamicResource TextPrimaryBrush}" />
@@ -231,7 +231,7 @@
                                 BorderBrush="{DynamicResource ThemeToggleActiveBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="999">
-                          <TextBlock Text="Добавить"
+                          <TextBlock Text="{Binding AddButtonText}"
                                      FontWeight="SemiBold"
                                      Foreground="{DynamicResource TextPrimaryBrush}" />
                         </Border>

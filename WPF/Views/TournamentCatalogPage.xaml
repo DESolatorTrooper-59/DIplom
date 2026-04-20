@@ -261,10 +261,10 @@
                       <StackPanel Grid.Row="3"
                                   Margin="18,18,18,18">
                         <Button Height="40"
-                                Content="Добавить участников"
-                                IsEnabled="{Binding IsAdminAddPlayersEnabled}"
-                                ToolTip="{Binding AdminAddPlayersToolTip}"
-                                Visibility="{Binding AdminAddPlayersVisibility}"
+                                Content="{Binding AdminManageParticipantsButtonText}"
+                                IsEnabled="{Binding IsAdminManageParticipantsEnabled}"
+                                ToolTip="{Binding AdminManageParticipantsToolTip}"
+                                Visibility="{Binding AdminManageParticipantsVisibility}"
                                 Click="AddParticipants_Click" />
                         <Button Height="40"
                                 Margin="0,0,0,12"
