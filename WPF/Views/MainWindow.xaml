@@ -36,29 +36,13 @@
                     Style="{StaticResource FlatIconButtonStyle}"
                     Click="ProfileButton_Click"
                     ToolTip="Открыть профиль.">
-              <Border Width="46"
-                      Height="46"
-                      Background="{DynamicResource ThemeToggleBackgroundBrush}"
-                      BorderBrush="{DynamicResource ThemeToggleBorderBrush}"
-                      BorderThickness="1"
-                      CornerRadius="12">
-                <TextBlock HorizontalAlignment="Center"
-                           VerticalAlignment="Center"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="22"
-                           Foreground="{DynamicResource ThemeToggleIconBrush}"
+              <Border Style="{DynamicResource SidebarBadgeBorderStyle}">
+                <TextBlock Style="{DynamicResource SidebarProfileIconStyle}"
                            Text="&#xE77B;" />
               </Border>
             </Button>
             <TextBlock x:Name="ProfileNameText"
-                       MaxWidth="138"
-                       Margin="12,0,0,0"
-                       VerticalAlignment="Center"
-                       FontSize="16"
-                       FontWeight="SemiBold"
-                       Foreground="{DynamicResource PanelTextBrush}"
-                       TextTrimming="CharacterEllipsis"
-                       TextWrapping="NoWrap" />
+                       Style="{DynamicResource SidebarProfileNameTextStyle}" />
           </StackPanel>
 
           <StackPanel Grid.Row="1"
@@ -66,13 +50,9 @@
                       Grid.ColumnSpan="3"
                       Margin="0,8,0,0">
             <TextBlock Text="Tournament Control"
-                       Foreground="{DynamicResource PanelTextBrush}"
-                       FontSize="24"
-                       FontWeight="Bold" />
+                       Style="{DynamicResource SidebarTitleTextStyle}" />
             <TextBlock x:Name="UserText"
-                       Margin="0,10,0,0"
-                       Foreground="{DynamicResource PanelMutedTextBrush}"
-                       TextWrapping="Wrap" />
+                       Style="{DynamicResource SidebarUserInfoTextStyle}" />
           </StackPanel>
 
           <Button Grid.Row="0"
@@ -86,18 +66,9 @@
                   Click="ThemeToggleButton_Click"
                   ToolTip="Переключить тему.">
             <Border x:Name="ThemeToggleBadge"
-                    Width="46"
-                    Height="46"
-                    Background="{DynamicResource ThemeToggleBackgroundBrush}"
-                    BorderBrush="{DynamicResource ThemeToggleBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="12">
+                    Style="{DynamicResource SidebarBadgeBorderStyle}">
               <TextBlock x:Name="ThemeToggleIcon"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         FontFamily="Segoe UI Symbol"
-                         FontSize="22"
-                         Foreground="{DynamicResource ThemeToggleIconBrush}"
+                         Style="{DynamicResource SidebarThemeIconStyle}"
                          Text="☀" />
             </Border>
           </Button>
@@ -113,34 +84,8 @@
                  Background="Transparent"
                  BorderThickness="0"
                  Foreground="{DynamicResource PanelTextBrush}"
+                 ItemContainerStyle="{DynamicResource SidebarNavigationItemStyle}"
                  SelectionChanged="EntitiesList_SelectionChanged">
-          <ListBox.ItemContainerStyle>
-            <Style TargetType="ListBoxItem">
-              <Setter Property="Margin" Value="0,0,0,8" />
-              <Setter Property="Padding" Value="14,10" />
-              <Setter Property="Foreground" Value="{DynamicResource PanelTextBrush}" />
-              <Setter Property="Background" Value="Transparent" />
-              <Setter Property="Template">
-                <Setter.Value>
-                  <ControlTemplate TargetType="ListBoxItem">
-                    <Border x:Name="Root"
-                            Background="{TemplateBinding Background}"
-                            CornerRadius="10">
-                      <ContentPresenter />
-                    </Border>
-                    <ControlTemplate.Triggers>
-                      <Trigger Property="IsSelected" Value="True">
-                        <Setter TargetName="Root" Property="Background" Value="{DynamicResource PanelItemSelectedBrush}" />
-                      </Trigger>
-                      <Trigger Property="IsMouseOver" Value="True">
-                        <Setter TargetName="Root" Property="Background" Value="{DynamicResource PanelItemHoverBrush}" />
-                      </Trigger>
-                    </ControlTemplate.Triggers>
-                  </ControlTemplate>
-                </Setter.Value>
-              </Setter>
-            </Style>
-          </ListBox.ItemContainerStyle>
         </ListBox>
       </DockPanel>
     </Border>
