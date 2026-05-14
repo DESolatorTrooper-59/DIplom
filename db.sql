@@ -1,9 +1,60 @@
 SET NOCOUNT ON;
 GO
 
+USE [master];
+GO
+
 IF DB_ID(N'SportsTournamentDB') IS NULL
 BEGIN
-    EXEC (N'CREATE DATABASE [SportsTournamentDB] COLLATE Cyrillic_General_CI_AS;');
+    BEGIN TRY
+        EXEC (N'CREATE DATABASE [SportsTournamentDB] COLLATE Cyrillic_General_CI_AS;');
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() NOT IN (5170, 1802)
+        BEGIN
+            THROW;
+        END;
+
+        DECLARE @DataPath NVARCHAR(4000) = CONVERT(NVARCHAR(4000), SERVERPROPERTY(N'InstanceDefaultDataPath'));
+        DECLARE @LogPath NVARCHAR(4000) = CONVERT(NVARCHAR(4000), SERVERPROPERTY(N'InstanceDefaultLogPath'));
+
+        IF NULLIF(@DataPath, N'') IS NULL
+        BEGIN
+            SELECT @DataPath = LEFT([physical_name], LEN([physical_name]) - CHARINDEX(N'\', REVERSE([physical_name])) + 1)
+            FROM [master].[sys].[master_files]
+            WHERE [database_id] = DB_ID(N'master') AND [file_id] = 1;
+        END;
+
+        IF NULLIF(@LogPath, N'') IS NULL
+        BEGIN
+            SELECT @LogPath = LEFT([physical_name], LEN([physical_name]) - CHARINDEX(N'\', REVERSE([physical_name])) + 1)
+            FROM [master].[sys].[master_files]
+            WHERE [database_id] = DB_ID(N'master') AND [file_id] = 2;
+        END;
+
+        IF RIGHT(@DataPath, 1) NOT IN (N'\', N'/') SET @DataPath += N'\';
+        IF RIGHT(@LogPath, 1) NOT IN (N'\', N'/') SET @LogPath += N'\';
+
+        DECLARE @Suffix NVARCHAR(32) = REPLACE(REPLACE(REPLACE(CONVERT(NVARCHAR(19), SYSDATETIME(), 126), N'-', N''), N':', N''), N'T', N'_');
+        DECLARE @DataFile NVARCHAR(4000) = @DataPath + N'SportsTournamentDB_' + @Suffix + N'.mdf';
+        DECLARE @LogFile NVARCHAR(4000) = @LogPath + N'SportsTournamentDB_log_' + @Suffix + N'.ldf';
+        DECLARE @CreateSql NVARCHAR(MAX) =
+N'CREATE DATABASE [SportsTournamentDB]
+ON PRIMARY
+(
+    NAME = N''SportsTournamentDB'',
+    FILENAME = N''' + REPLACE(@DataFile, N'''', N'''''') + N'''
+)
+LOG ON
+(
+    NAME = N''SportsTournamentDB_log'',
+    FILENAME = N''' + REPLACE(@LogFile, N'''', N'''''') + N'''
+)
+COLLATE Cyrillic_General_CI_AS;';
+
+        PRINT N'Файл базы данных с именем по умолчанию уже существует. Создается новая база с уникальными физическими именами файлов.';
+        EXEC (@CreateSql);
+    END CATCH;
 END
 GO
 
