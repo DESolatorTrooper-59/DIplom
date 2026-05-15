@@ -691,19 +691,12 @@ namespace Tournaments.WPF.Services
                 ["MaxPlayersPerTeam"] = 4
             });
 
-            SeedTeam(1, "NAVI", new DateTime(2009, 12, 17), "Ukraine", "B1ad3", -60);
-            SeedTeam(2, "Team Spirit", new DateTime(2015, 12, 5), "Russia", "hally", -55);
-            SeedTeam(3, "Virtus.pro", new DateTime(2003, 11, 1), "Russia", "dastan", -50);
-            SeedTeam(4, "G2 Esports", new DateTime(2015, 2, 24), "Germany", "TaZ", -45);
-            SeedTeam(5, "FaZe Clan", new DateTime(2010, 5, 30), "United States", "NEO", -40);
-            SeedTeam(6, "MOUZ", new DateTime(2002, 8, 1), "Germany", "sycrone", -35);
-            SeedTeam(7, "Team Vitality", new DateTime(2013, 8, 5), "France", "XTQZZZ", -30);
-            SeedTeam(8, "Cloud9", new DateTime(2013, 1, 9), "United States", "groove", -25);
-            SeedTeam(9, "BetBoom Team", new DateTime(2022, 4, 8), "Russia", "boolk", -20);
-            SeedTeam(10, "OG", new DateTime(2015, 8, 31), "Europe", "ruggah", -15);
+            SeedTeam(1, "Bikerush team 01", new DateTime(2009, 12, 17), "Online", "Bikerush", new DateTime(2026, 5, 14));
+            SeedTeam(2, "Zaneki team", new DateTime(2015, 12, 5), "Online", "Zaneki", new DateTime(2026, 5, 14));
+            SeedTeam(3, "Bartjones team", new DateTime(2026, 4, 28), "Online", "Bartjones", new DateTime(2026, 5, 15));
+            SeedTeam(4, "Bookuha team", new DateTime(2026, 4, 27), "Online", "Bookuha", new DateTime(2026, 5, 15));
+            SeedTeam(5, "DavidZD team", new DateTime(2026, 5, 1), "Online", "DavidZD", new DateTime(2026, 5, 15));
 
-            SeedPlayer(1, "s1mple", "Oleksandr Kostyliev", "Ukraine", new DateTime(1997, 10, 2));
-            SeedPlayer(2, "donk", "Danil Kryshkovets", "Russia", new DateTime(2007, 1, 25));
             SeedPlayer(3, "DESolatorTrooper", "Sergey Kornev", "Russia", new DateTime(2005, 6, 21));
             SeedPlayer(4, "Bookuha", "Andrey", "Ukraine", new DateTime(2000, 1, 1));
             SeedPlayer(5, "Bikerushownz", "Скрыто", "United Kingdom", new DateTime(2000, 1, 1));
@@ -711,18 +704,18 @@ namespace Tournaments.WPF.Services
             SeedPlayer(7, "Mah_Boi", "Скрыто", "Blocked", new DateTime(2000, 1, 1));
             SeedPlayer(8, "Lamas", "Скрыто", "USA", new DateTime(2026, 4, 1));
             SeedPlayer(9, "Rildcom", "Скрыто", "Australia", new DateTime(2000, 1, 1));
-            SeedPlayer(10, "Svenson", "Скрыто", "Nigerlands", new DateTime(2000, 1, 1));
-
-            SeedTeamPlayer(1, 1, 1, "AWPer", -6);
-            SeedTeamPlayer(2, 2, 2, "Rifler", -5);
-            SeedTeamPlayer(3, 3, 3, "Entry Fragger", -5);
-            SeedTeamPlayer(4, 4, 4, "Star Rifler", -4);
-            SeedTeamPlayer(5, 5, 5, "Closer", -4);
-            SeedTeamPlayer(6, 6, 6, "Lurker", -3);
-            SeedTeamPlayer(7, 7, 7, "Sniper", -3);
-            SeedTeamPlayer(8, 8, 8, "Captain", -2);
-            SeedTeamPlayer(9, 9, 9, "Support", -2);
-            SeedTeamPlayer(10, 10, 10, "Midlaner", -1);
+            SeedPlayer(10, "Svenson", "Скрыто", "Online", new DateTime(2000, 1, 1));
+            SeedPlayer(11, "Redeemer", "Dmitry", "Russia", new DateTime(2026, 4, 29));
+            SeedPlayer(12, "Lumos", "Скрыто", "Russia", new DateTime(2026, 1, 13));
+            SeedPlayer(13, "FateZero", "Скрыто", "Pakistan", new DateTime(2019, 2, 13));
+            SeedPlayer(14, "Player 1", "Player", "Online", new DateTime(2026, 4, 29));
+            SeedPlayer(15, "UnderworldFox", "Скрыто", "South Africa", new DateTime(2025, 10, 14));
+            SeedPlayer(16, "Aquatech", "Скрыто", "Unknown", new DateTime(2025, 11, 13));
+            SeedPlayer(17, "Iluhan", "Илья", "Russia", new DateTime(1970, 3, 1));
+            SeedPlayer(18, "YourHorse", "Скрыто", "Europe", new DateTime(2011, 2, 1));
+            SeedPlayer(19, "MrNoSweat", "Скрыто", "Europe", new DateTime(1981, 3, 18));
+            SeedPlayer(20, "GreeeeeeenAlert", "Скрыто", "Russia", new DateTime(2003, 5, 30));
+            SeedPlayer(21, "Player 21", "Скрыто", "Unknown", new DateTime(1970, 1, 1));
 
             SeedRow("Sponsors", new Dictionary<string, object>
             {
@@ -745,97 +738,112 @@ namespace Tournaments.WPF.Services
                 ["Industry"] = "Peripherals"
             });
 
-            SeedRow("Tournaments", new Dictionary<string, object>
-            {
-                ["TournamentID"] = 1,
-                ["TournamentName"] = "Spring Invitational 2026",
-                ["GameID"] = 1,
-                ["StartDate"] = new DateTime(2026, 5, 10),
-                ["EndDate"] = new DateTime(2026, 5, 12),
-                ["PrizePool"] = 150000m,
-                ["Organizer"] = "admin",
-                ["Location"] = "Moscow",
-                ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 2,
-                ["ParticipantMode"] = "Команды"
-            });
+            SeedTournament(1, "Spring Invitational 2026", 1, new DateTime(2026, 5, 10), new DateTime(2026, 5, 12), 150000m, "admin", "Online", "Double Elimination", 8, "Игроки");
+            SeedTournament(2, "WEC Season 1", 3, new DateTime(2026, 2, 1), null, 1000m, "Bikerushownz", "Online", "League", 8, "Игроки");
+            SeedTournament(3, "WEC Season 2", 3, new DateTime(2026, 3, 1), null, 1000m, "Bikerushownz", "Online", "League", 24, "Игроки");
+            SeedTournament(4, "Red Champions", 5, new DateTime(2024, 7, 5), new DateTime(2024, 8, 16), 1m, "MoscowCypersports", "Online", "Single Elimination", 24, "Игроки");
+            SeedTournament(5, "WEC Team Cup", 3, new DateTime(2026, 2, 5), new DateTime(2026, 2, 6), 0m, "admin", "Online", "Single Elimination", 8, "Команды");
 
-            SeedRow("Tournaments", new Dictionary<string, object>
-            {
-                ["TournamentID"] = 2,
-                ["TournamentName"] = "WEC Season 1",
-                ["GameID"] = 3,
-                ["StartDate"] = new DateTime(2026, 2, 1),
-                ["EndDate"] = DBNull.Value,
-                ["PrizePool"] = 1000m,
-                ["Organizer"] = "Bikerushownz",
-                ["Location"] = "Online",
-                ["FormatType"] = "League",
-                ["MaxTeams"] = 8,
-                ["ParticipantMode"] = "Игроки"
-            });
+            SeedTournamentStage(1, 1, "Playoffs", 1, "Winner");
+            SeedTournamentStage(2, 4, "Bracket - Round of 32", 100, "Winner");
+            SeedTournamentStage(3, 4, "Bracket - Round of 16", 101, "Winner");
+            SeedTournamentStage(4, 4, "Bracket - Quarterfinals", 102, "Winner");
+            SeedTournamentStage(5, 4, "Bracket - Semifinals", 103, "Winner");
+            SeedTournamentStage(6, 4, "Bracket - Grand Final", 104, "Final");
+            SeedTournamentStage(7, 2, "League - Round 1", 400, DBNull.Value);
+            SeedTournamentStage(8, 2, "League - Round 2", 401, DBNull.Value);
+            SeedTournamentStage(9, 2, "League - Round 3", 402, DBNull.Value);
+            SeedTournamentStage(10, 2, "League - Round 4", 403, DBNull.Value);
+            SeedTournamentStage(11, 2, "League - Round 5", 404, DBNull.Value);
+            SeedTournamentStage(12, 5, "Bracket - Semifinals", 100, "Winner");
+            SeedTournamentStage(13, 5, "Bracket - Grand Final", 101, "Final");
+            SeedTournamentStage(14, 3, "League - Round 1", 400, DBNull.Value);
+            SeedTournamentStage(15, 3, "League - Round 2", 401, DBNull.Value);
+            SeedTournamentStage(16, 3, "League - Round 3", 402, DBNull.Value);
+            SeedTournamentStage(17, 3, "League - Round 4", 403, DBNull.Value);
+            SeedTournamentStage(18, 3, "League - Round 5", 404, DBNull.Value);
+            SeedTournamentStage(19, 3, "League - Round 6", 405, DBNull.Value);
+            SeedTournamentStage(20, 3, "League - Round 7", 406, DBNull.Value);
+            SeedTournamentStage(21, 3, "League - Round 8", 407, DBNull.Value);
+            SeedTournamentStage(22, 3, "League - Round 9", 408, DBNull.Value);
+            SeedTournamentStage(23, 3, "League - Round 10", 409, DBNull.Value);
+            SeedTournamentStage(24, 3, "League - Round 11", 410, DBNull.Value);
+            SeedTournamentStage(25, 3, "League - Round 12", 411, DBNull.Value);
+            SeedTournamentStage(26, 3, "League - Round 13", 412, DBNull.Value);
+            SeedTournamentStage(27, 3, "League - Round 14", 413, DBNull.Value);
+            SeedTournamentStage(28, 3, "League - Round 15", 414, DBNull.Value);
+            SeedTournamentStage(29, 3, "League - Round 16", 415, DBNull.Value);
+            SeedTournamentStage(30, 3, "League - Round 17", 416, DBNull.Value);
+            SeedTournamentStage(31, 3, "League - Round 18", 417, DBNull.Value);
+            SeedTournamentStage(32, 3, "League - Round 19", 418, DBNull.Value);
+            SeedTournamentStage(33, 1, "Bracket - Upper - Upper Quarterfinals", 100, "Winner");
+            SeedTournamentStage(34, 1, "Bracket - Upper - Upper Semifinals", 101, "Winner");
+            SeedTournamentStage(35, 1, "Bracket - Upper - Upper Final", 102, "Winner");
+            SeedTournamentStage(36, 1, "Bracket - Lower - Round 1", 200, "Loser");
+            SeedTournamentStage(37, 1, "Bracket - Lower - Round 2", 201, "Loser");
+            SeedTournamentStage(38, 1, "Bracket - Lower - Round 3", 202, "Loser");
+            SeedTournamentStage(39, 1, "Bracket - Lower - Final", 203, "Loser");
+            SeedTournamentStage(40, 1, "Bracket - Grand Final", 300, "Final");
 
-            SeedRow("Tournaments", new Dictionary<string, object>
-            {
-                ["TournamentID"] = 3,
-                ["TournamentName"] = "WEC Season 2",
-                ["GameID"] = 3,
-                ["StartDate"] = new DateTime(2026, 3, 1),
-                ["EndDate"] = DBNull.Value,
-                ["PrizePool"] = 1000m,
-                ["Organizer"] = "Bikerushownz",
-                ["Location"] = "Online",
-                ["FormatType"] = "League",
-                ["MaxTeams"] = 24,
-                ["ParticipantMode"] = "Игроки"
-            });
+            SeedTournamentParticipant(1, 1, 1, 1, null, null);
+            SeedTournamentParticipant(2, 1, 2, 2, null, null);
+            SeedTournamentParticipant(3, 2, null, 1, 3, null);
+            SeedTournamentParticipant(4, 2, null, 2, 4, null);
+            SeedTournamentParticipant(6, 2, null, 3, 6, null);
+            SeedTournamentParticipant(7, 2, null, 4, 8, null);
+            SeedTournamentParticipant(8, 2, null, 5, 9, null);
+            SeedTournamentParticipant(9, 2, null, 6, 10, null);
+            SeedTournamentParticipant(13, 3, null, 3, 4, null);
+            SeedTournamentParticipant(14, 4, null, 1, 5, null);
+            SeedTournamentParticipant(15, 4, null, 2, 3, null);
+            SeedTournamentParticipant(17, 5, 2, 2, null, null);
+            SeedTournamentParticipant(18, 5, 3, 3, null, null);
+            SeedTournamentParticipant(19, 5, 4, 4, null, null);
+            SeedTournamentParticipant(20, 5, 5, 5, null, null);
+            SeedTournamentParticipant(21, 3, null, 4, 16, null);
+            SeedTournamentParticipant(22, 3, null, 5, 17, null);
+            SeedTournamentParticipant(23, 3, null, 6, 6, null);
+            SeedTournamentParticipant(24, 3, null, 7, 20, null);
+            SeedTournamentParticipant(25, 3, null, 8, 13, null);
+            SeedTournamentParticipant(26, 3, null, 9, 3, null);
+            SeedTournamentParticipant(27, 3, null, 10, 5, null);
+            SeedTournamentParticipant(28, 3, null, 11, 7, null);
+            SeedTournamentParticipant(29, 3, null, 12, 12, null);
+            SeedTournamentParticipant(30, 3, null, 13, 8, null);
+            SeedTournamentParticipant(31, 3, null, 14, 11, null);
+            SeedTournamentParticipant(32, 3, null, 15, 14, null);
+            SeedTournamentParticipant(33, 3, null, 16, 19, null);
+            SeedTournamentParticipant(34, 3, null, 17, 10, null);
+            SeedTournamentParticipant(35, 3, null, 18, 15, null);
+            SeedTournamentParticipant(36, 3, null, 19, 9, null);
+            SeedTournamentParticipant(37, 3, null, 20, 21, null);
+            SeedTournamentParticipant(38, 3, null, 21, 18, null);
+            SeedTournamentParticipant(39, 1, null, 3, 5, null);
+            SeedTournamentParticipant(40, 1, null, 4, 4, null);
+            SeedTournamentParticipant(41, 1, null, 5, 16, null);
+            SeedTournamentParticipant(42, 1, null, 6, 17, null);
+            SeedTournamentParticipant(43, 1, null, 7, 3, null);
+            SeedTournamentParticipant(44, 4, null, 3, 4, null);
+            SeedTournamentParticipant(45, 4, null, 4, 16, null);
+            SeedTournamentParticipant(46, 4, null, 5, 20, null);
+            SeedTournamentParticipant(47, 4, null, 6, 6, null);
+            SeedTournamentParticipant(48, 4, null, 7, 13, null);
+            SeedTournamentParticipant(49, 4, null, 8, 12, null);
+            SeedTournamentParticipant(50, 4, null, 9, 8, null);
+            SeedTournamentParticipant(51, 4, null, 10, 17, null);
+            SeedTournamentParticipant(52, 4, null, 11, 11, null);
+            SeedTournamentParticipant(53, 4, null, 12, 14, null);
+            SeedTournamentParticipant(54, 4, null, 13, 19, null);
+            SeedTournamentParticipant(55, 4, null, 14, 7, null);
+            SeedTournamentParticipant(56, 4, null, 15, 10, null);
+            SeedTournamentParticipant(57, 4, null, 16, 9, null);
+            SeedTournamentParticipant(58, 4, null, 17, 21, null);
+            SeedTournamentParticipant(59, 4, null, 18, 18, null);
+            SeedTournamentParticipant(60, 4, null, 19, 15, null);
 
-            SeedRow("Tournaments", new Dictionary<string, object>
-            {
-                ["TournamentID"] = 4,
-                ["TournamentName"] = "Red Champions",
-                ["GameID"] = 5,
-                ["StartDate"] = new DateTime(2024, 7, 5),
-                ["EndDate"] = new DateTime(2024, 8, 16),
-                ["PrizePool"] = 1m,
-                ["Organizer"] = "MoscowCypersports",
-                ["Location"] = "Online",
-                ["FormatType"] = "Single Elimination",
-                ["MaxTeams"] = 24,
-                ["ParticipantMode"] = "Игроки"
-            });
-
-            SeedRow("TournamentStages", new Dictionary<string, object>
-            {
-                ["StageID"] = 1,
-                ["TournamentID"] = 1,
-                ["StageName"] = "Playoffs",
-                ["StageOrder"] = 1,
-                ["BracketType"] = "Winner"
-            });
-
-            SeedTournamentParticipant(1, 1, 1, 1);
-            SeedTournamentParticipant(2, 1, 2, 2);
-            SeedTournamentParticipant(3, 2, null, 1, 3);
-            SeedTournamentParticipant(4, 2, null, 2, 4);
-            SeedTournamentParticipant(6, 2, null, 3, 6);
-            SeedTournamentParticipant(7, 2, null, 4, 8);
-            SeedTournamentParticipant(8, 2, null, 5, 9);
-            SeedTournamentParticipant(9, 2, null, 6, 10);
-            SeedTournamentParticipant(11, 3, null, 1, 1);
-            SeedTournamentParticipant(12, 3, null, 2, 2);
-            SeedTournamentParticipant(13, 3, null, 3, 4);
-            SeedTournamentParticipant(14, 4, null, 1, 5);
-            SeedTournamentParticipant(15, 4, null, 2, 3);
-
-            SeedRow("Streams", new Dictionary<string, object>
-            {
-                ["StreamID"] = 1,
-                ["TournamentID"] = 1,
-                ["MatchID"] = DBNull.Value,
-                ["Platform"] = "Twitch",
-                ["StreamURL"] = "https://twitch.tv/tournamentsdemo"
-            });
+            SeedMatch(48, 5, 12, 1, 2, 5, null, null, null, null, 0, 0, "05.02.2026", 3, "Scheduled");
+            SeedMatch(49, 5, 12, 2, 3, 4, null, null, null, null, 0, 0, "05.02.2026", 3, "Scheduled");
+            SeedMatch(50, 5, 13, 3, null, null, null, null, null, null, 0, 0, "06.02.2026", 5, "Scheduled");
 
             SeedRow("TournamentSponsors", new Dictionary<string, object>
             {
@@ -862,7 +870,7 @@ namespace Tournaments.WPF.Services
             });
         }
 
-        private void SeedTeam(int teamId, string name, DateTime foundedDate, string country, string coachName, int createdOffsetDays)
+        private void SeedTeam(int teamId, string name, DateTime foundedDate, string country, string coachName, DateTime createdDate)
         {
             SeedRow("Teams", new Dictionary<string, object>
             {
@@ -871,7 +879,7 @@ namespace Tournaments.WPF.Services
                 ["FoundedDate"] = foundedDate,
                 ["Country"] = country,
                 ["CoachName"] = coachName,
-                ["CreatedDate"] = DateTime.Today.AddDays(createdOffsetDays)
+                ["CreatedDate"] = createdDate
             });
         }
 
@@ -884,6 +892,47 @@ namespace Tournaments.WPF.Services
                 ["RealName"] = realName,
                 ["Country"] = country,
                 ["BirthDate"] = birthDate
+            });
+        }
+
+        private void SeedTournament(
+            int tournamentId,
+            string name,
+            int gameId,
+            DateTime startDate,
+            DateTime? endDate,
+            decimal prizePool,
+            string organizer,
+            string location,
+            string formatType,
+            int maxParticipants,
+            string participantMode)
+        {
+            SeedRow("Tournaments", new Dictionary<string, object>
+            {
+                ["TournamentID"] = tournamentId,
+                ["TournamentName"] = name,
+                ["GameID"] = gameId,
+                ["StartDate"] = startDate,
+                ["EndDate"] = endDate.HasValue ? (object)endDate.Value : DBNull.Value,
+                ["PrizePool"] = prizePool,
+                ["Organizer"] = organizer,
+                ["Location"] = location,
+                ["FormatType"] = formatType,
+                ["MaxTeams"] = maxParticipants,
+                ["ParticipantMode"] = participantMode
+            });
+        }
+
+        private void SeedTournamentStage(int stageId, int tournamentId, string stageName, int stageOrder, object bracketType)
+        {
+            SeedRow("TournamentStages", new Dictionary<string, object>
+            {
+                ["StageID"] = stageId,
+                ["TournamentID"] = tournamentId,
+                ["StageName"] = stageName,
+                ["StageOrder"] = stageOrder,
+                ["BracketType"] = bracketType
             });
         }
 
@@ -901,7 +950,7 @@ namespace Tournaments.WPF.Services
             });
         }
 
-        private void SeedTournamentParticipant(int participationId, int tournamentId, int? teamId, int seed, int? playerId = null)
+        private void SeedTournamentParticipant(int participationId, int tournamentId, int? teamId, int seed, int? playerId = null, int? finalPlace = null)
         {
             SeedRow("TournamentParticipants", new Dictionary<string, object>
             {
@@ -910,7 +959,44 @@ namespace Tournaments.WPF.Services
                 ["TeamID"] = teamId.HasValue ? (object)teamId.Value : DBNull.Value,
                 ["PlayerID"] = playerId.HasValue ? (object)playerId.Value : DBNull.Value,
                 ["Seed"] = seed,
-                ["FinalPlace"] = DBNull.Value
+                ["FinalPlace"] = finalPlace.HasValue ? (object)finalPlace.Value : DBNull.Value
+            });
+        }
+
+        private void SeedMatch(
+            int matchId,
+            int tournamentId,
+            int stageId,
+            int matchNumber,
+            int? team1Id,
+            int? team2Id,
+            int? winnerTeamId,
+            int? player1Id,
+            int? player2Id,
+            int? winnerPlayerId,
+            int team1Score,
+            int team2Score,
+            string matchDate,
+            int bestOf,
+            string status)
+        {
+            SeedRow("Matches", new Dictionary<string, object>
+            {
+                ["MatchID"] = matchId,
+                ["TournamentID"] = tournamentId,
+                ["StageID"] = stageId,
+                ["MatchNumber"] = matchNumber,
+                ["Team1ID"] = team1Id.HasValue ? (object)team1Id.Value : DBNull.Value,
+                ["Team2ID"] = team2Id.HasValue ? (object)team2Id.Value : DBNull.Value,
+                ["WinnerTeamID"] = winnerTeamId.HasValue ? (object)winnerTeamId.Value : DBNull.Value,
+                ["Player1ID"] = player1Id.HasValue ? (object)player1Id.Value : DBNull.Value,
+                ["Player2ID"] = player2Id.HasValue ? (object)player2Id.Value : DBNull.Value,
+                ["WinnerPlayerID"] = winnerPlayerId.HasValue ? (object)winnerPlayerId.Value : DBNull.Value,
+                ["Team1Score"] = team1Score,
+                ["Team2Score"] = team2Score,
+                ["MatchDate"] = matchDate,
+                ["BestOf"] = bestOf,
+                ["Status"] = status
             });
         }
 

@@ -357,7 +357,9 @@ CREATE TABLE [dbo].[СпонсорыТурниров]
 GO
 
 INSERT INTO [dbo].[Организаторы] ([Логин], [Пароль])
-VALUES (N'admin', N'password');
+VALUES
+    (N'admin', N'password'),
+    (N'organizer', N'organizer');
 
 INSERT INTO [dbo].[Игры] ([НазваниеИгры], [Разработчик], [ГодВыпуска], [МаксИгроковВКоманде])
 VALUES
@@ -367,29 +369,55 @@ VALUES
     (N'Red Alert 2', N'Westwood Studios, EA Pacific', 2000, 4),
     (N'Red Alert 3', N'EA LA', 2008, 4);
 
-INSERT INTO [dbo].[Команды] ([НазваниеКоманды], [ДатаОснования], [Страна], [ИмяТренера])
-VALUES
-    (N'NAVI', '2009-12-17', N'Ukraine', N'B1ad3'),
-    (N'Team Spirit', '2015-12-05', N'Russia', N'hally');
+SET IDENTITY_INSERT [dbo].[Команды] ON;
 
-INSERT INTO [dbo].[Игроки] ([Никнейм], [НастоящееИмя], [Страна], [ДатаРождения])
+INSERT INTO [dbo].[Команды] ([IDКоманды], [НазваниеКоманды], [ДатаОснования], [Страна], [ИмяТренера], [ДатаСоздания])
 VALUES
-    (N's1mple', N'Oleksandr Kostyliev', N'Ukraine', '1997-10-02'),
-    (N'donk', N'Danil Kryshkovets', N'Russia', '2007-01-25'),
-    (N'DESolatorTrooper', N'Sergey Kornev', N'Russia', '2005-06-21'),
-    (N'Bookuha', N'Andrey', N'Ukraine', '2000-01-01'),
-    (N'Bikerushownz', N'Скрыто', N'United Kingdom', '2000-01-01'),
-    (N'Hulk', N'Ivan', N'Russia', '2000-01-01'),
-    (N'Mah_Boi', N'Скрыто', N'Blocked', '2000-01-01'),
-    (N'Lamas', N'Скрыто', N'USA', '2026-04-01'),
-    (N'Rildcom', N'Скрыто', N'Australia', '2000-01-01'),
-    (N'Svenson', N'Скрыто', N'Nigerlands', '2000-01-01');
+    (1, N'Bikerush team 01', '2009-12-17', N'Online', N'Bikerush', '2026-05-14T18:05:06'),
+    (2, N'Zaneki team', '2015-12-05', N'Online', N'Zaneki', '2026-05-14T18:05:06'),
+    (3, N'Bartjones team', '2026-04-28', N'Online', N'Bartjones', '2026-05-15T18:33:45'),
+    (4, N'Bookuha team', '2026-04-27', N'Online', N'Bookuha', '2026-05-15T18:34:11'),
+    (5, N'DavidZD team', '2026-05-01', N'Online', N'DavidZD', '2026-05-15T18:34:35');
+
+SET IDENTITY_INSERT [dbo].[Команды] OFF;
+
+SET IDENTITY_INSERT [dbo].[Игроки] ON;
+
+INSERT INTO [dbo].[Игроки] ([IDИгрока], [Никнейм], [НастоящееИмя], [Страна], [ДатаРождения], [Пароль])
+VALUES
+    (3, N'DESolatorTrooper', N'Sergey Kornev', N'Russia', '2005-06-21', NULL),
+    (4, N'Bookuha', N'Andrey', N'Ukraine', '2000-01-01', NULL),
+    (5, N'Bikerushownz', N'Скрыто', N'United Kingdom', '2000-01-01', NULL),
+    (6, N'Hulk', N'Ivan', N'Russia', '2000-01-01', NULL),
+    (7, N'Mah_Boi', N'Скрыто', N'Blocked', '2000-01-01', NULL),
+    (8, N'Lamas', N'Скрыто', N'USA', '2026-04-01', NULL),
+    (9, N'Rildcom', N'Скрыто', N'Australia', '2000-01-01', NULL),
+    (10, N'Svenson', N'Скрыто', N'Online', '2000-01-01', NULL),
+    (11, N'Redeemer', N'Dmitry', N'Russia', '2026-04-29', NULL),
+    (12, N'Lumos', N'Скрыто', N'Russia', '2026-01-13', NULL),
+    (13, N'FateZero', N'Скрыто', N'Pakistan', '2019-02-13', NULL),
+    (14, N'Player 1', N'Player', N'Online', '2026-04-29', NULL),
+    (15, N'UnderworldFox', N'Скрыто', N'South Africa', '2025-10-14', NULL),
+    (16, N'Aquatech', N'Скрыто', N'Unknown', '2025-11-13', NULL),
+    (17, N'Iluhan', N'Илья', N'Russia', '1970-03-01', NULL),
+    (18, N'YourHorse', N'Скрыто', N'Europe', '2011-02-01', NULL),
+    (19, N'MrNoSweat', N'Скрыто', N'Europe', '1981-03-18', NULL),
+    (20, N'GreeeeeeenAlert', N'Скрыто', N'Russia', '2003-05-30', NULL),
+    (21, N'Player 21', N'Скрыто', N'Unknown', '1970-01-01', NULL);
+
+SET IDENTITY_INSERT [dbo].[Игроки] OFF;
 
 INSERT INTO [dbo].[Спонсоры] ([НазваниеСпонсора], [Индустрия])
-VALUES (N'Red Bull', N'Energy Drinks');
+VALUES
+    (N'Red Bull', N'Energy Drinks'),
+    (N'Intel', N'Hardware'),
+    (N'Logitech G', N'Peripherals');
+
+SET IDENTITY_INSERT [dbo].[Турниры] ON;
 
 INSERT INTO [dbo].[Турниры]
 (
+    [IDТурнира],
     [НазваниеТурнира],
     [IDИгры],
     [ДатаНачала],
@@ -403,18 +431,20 @@ INSERT INTO [dbo].[Турниры]
 )
 VALUES
 (
+    1,
     N'Spring Invitational 2026',
     1,
     '2026-05-10',
     '2026-05-12',
     150000.00,
     N'admin',
-    N'Moscow',
-    N'Single Elimination',
-    2,
-    N'Команды'
+    N'Online',
+    N'Double Elimination',
+    8,
+    N'Игроки'
 ),
 (
+    2,
     N'WEC Season 1',
     3,
     '2026-02-01',
@@ -427,6 +457,7 @@ VALUES
     N'Игроки'
 ),
 (
+    3,
     N'WEC Season 2',
     3,
     '2026-03-01',
@@ -439,6 +470,7 @@ VALUES
     N'Игроки'
 ),
 (
+    4,
     N'Red Champions',
     5,
     '2024-07-05',
@@ -449,15 +481,69 @@ VALUES
     N'Single Elimination',
     24,
     N'Игроки'
+),
+(
+    5,
+    N'WEC Team Cup',
+    3,
+    '2026-02-05',
+    '2026-02-06',
+    0.00,
+    N'admin',
+    N'Online',
+    N'Single Elimination',
+    8,
+    N'Команды'
 );
 
-INSERT INTO [dbo].[ЭтапыТурниров] ([IDТурнира], [НазваниеЭтапа], [ПорядокЭтапа], [ТипСетки])
-VALUES (1, N'Playoffs', 1, N'Winner');
+SET IDENTITY_INSERT [dbo].[Турниры] OFF;
 
-INSERT INTO [dbo].[СоставыКоманд] ([IDКоманды], [IDИгрока], [ДатаПрисоединения], [Активен], [Роль])
+SET IDENTITY_INSERT [dbo].[ЭтапыТурниров] ON;
+
+INSERT INTO [dbo].[ЭтапыТурниров] ([IDЭтапа], [IDТурнира], [НазваниеЭтапа], [ПорядокЭтапа], [ТипСетки])
 VALUES
-    (1, 1, '2026-01-15', 1, N'AWPer'),
-    (2, 2, '2026-01-20', 1, N'Star Player');
+    (1, 1, N'Playoffs', 1, N'Winner'),
+    (2, 4, N'Bracket - Round of 32', 100, N'Winner'),
+    (3, 4, N'Bracket - Round of 16', 101, N'Winner'),
+    (4, 4, N'Bracket - Quarterfinals', 102, N'Winner'),
+    (5, 4, N'Bracket - Semifinals', 103, N'Winner'),
+    (6, 4, N'Bracket - Grand Final', 104, N'Final'),
+    (7, 2, N'League - Round 1', 400, NULL),
+    (8, 2, N'League - Round 2', 401, NULL),
+    (9, 2, N'League - Round 3', 402, NULL),
+    (10, 2, N'League - Round 4', 403, NULL),
+    (11, 2, N'League - Round 5', 404, NULL),
+    (12, 5, N'Bracket - Semifinals', 100, N'Winner'),
+    (13, 5, N'Bracket - Grand Final', 101, N'Final'),
+    (14, 3, N'League - Round 1', 400, NULL),
+    (15, 3, N'League - Round 2', 401, NULL),
+    (16, 3, N'League - Round 3', 402, NULL),
+    (17, 3, N'League - Round 4', 403, NULL),
+    (18, 3, N'League - Round 5', 404, NULL),
+    (19, 3, N'League - Round 6', 405, NULL),
+    (20, 3, N'League - Round 7', 406, NULL),
+    (21, 3, N'League - Round 8', 407, NULL),
+    (22, 3, N'League - Round 9', 408, NULL),
+    (23, 3, N'League - Round 10', 409, NULL),
+    (24, 3, N'League - Round 11', 410, NULL),
+    (25, 3, N'League - Round 12', 411, NULL),
+    (26, 3, N'League - Round 13', 412, NULL),
+    (27, 3, N'League - Round 14', 413, NULL),
+    (28, 3, N'League - Round 15', 414, NULL),
+    (29, 3, N'League - Round 16', 415, NULL),
+    (30, 3, N'League - Round 17', 416, NULL),
+    (31, 3, N'League - Round 18', 417, NULL),
+    (32, 3, N'League - Round 19', 418, NULL),
+    (33, 1, N'Bracket - Upper - Upper Quarterfinals', 100, N'Winner'),
+    (34, 1, N'Bracket - Upper - Upper Semifinals', 101, N'Winner'),
+    (35, 1, N'Bracket - Upper - Upper Final', 102, N'Winner'),
+    (36, 1, N'Bracket - Lower - Round 1', 200, N'Loser'),
+    (37, 1, N'Bracket - Lower - Round 2', 201, N'Loser'),
+    (38, 1, N'Bracket - Lower - Round 3', 202, N'Loser'),
+    (39, 1, N'Bracket - Lower - Final', 203, N'Loser'),
+    (40, 1, N'Bracket - Grand Final', 300, N'Final');
+
+SET IDENTITY_INSERT [dbo].[ЭтапыТурниров] OFF;
 
 SET IDENTITY_INSERT [dbo].[УчастникиТурниров] ON;
 
@@ -471,22 +557,70 @@ VALUES
     (7, 2, NULL, 8, 4, NULL),
     (8, 2, NULL, 9, 5, NULL),
     (9, 2, NULL, 10, 6, NULL),
-    (11, 3, NULL, 1, 1, NULL),
-    (12, 3, NULL, 2, 2, NULL),
     (13, 3, NULL, 4, 3, NULL),
     (14, 4, NULL, 5, 1, NULL),
-    (15, 4, NULL, 3, 2, NULL);
+    (15, 4, NULL, 3, 2, NULL),
+    (17, 5, 2, NULL, 2, NULL),
+    (18, 5, 3, NULL, 3, NULL),
+    (19, 5, 4, NULL, 4, NULL),
+    (20, 5, 5, NULL, 5, NULL),
+    (21, 3, NULL, 16, 4, NULL),
+    (22, 3, NULL, 17, 5, NULL),
+    (23, 3, NULL, 6, 6, NULL),
+    (24, 3, NULL, 20, 7, NULL),
+    (25, 3, NULL, 13, 8, NULL),
+    (26, 3, NULL, 3, 9, NULL),
+    (27, 3, NULL, 5, 10, NULL),
+    (28, 3, NULL, 7, 11, NULL),
+    (29, 3, NULL, 12, 12, NULL),
+    (30, 3, NULL, 8, 13, NULL),
+    (31, 3, NULL, 11, 14, NULL),
+    (32, 3, NULL, 14, 15, NULL),
+    (33, 3, NULL, 19, 16, NULL),
+    (34, 3, NULL, 10, 17, NULL),
+    (35, 3, NULL, 15, 18, NULL),
+    (36, 3, NULL, 9, 19, NULL),
+    (37, 3, NULL, 21, 20, NULL),
+    (38, 3, NULL, 18, 21, NULL),
+    (39, 1, NULL, 5, 3, NULL),
+    (40, 1, NULL, 4, 4, NULL),
+    (41, 1, NULL, 16, 5, NULL),
+    (42, 1, NULL, 17, 6, NULL),
+    (43, 1, NULL, 3, 7, NULL),
+    (44, 4, NULL, 4, 3, NULL),
+    (45, 4, NULL, 16, 4, NULL),
+    (46, 4, NULL, 20, 5, NULL),
+    (47, 4, NULL, 6, 6, NULL),
+    (48, 4, NULL, 13, 7, NULL),
+    (49, 4, NULL, 12, 8, NULL),
+    (50, 4, NULL, 8, 9, NULL),
+    (51, 4, NULL, 17, 10, NULL),
+    (52, 4, NULL, 11, 11, NULL),
+    (53, 4, NULL, 14, 12, NULL),
+    (54, 4, NULL, 19, 13, NULL),
+    (55, 4, NULL, 7, 14, NULL),
+    (56, 4, NULL, 10, 15, NULL),
+    (57, 4, NULL, 9, 16, NULL),
+    (58, 4, NULL, 21, 17, NULL),
+    (59, 4, NULL, 18, 18, NULL),
+    (60, 4, NULL, 15, 19, NULL);
 
 SET IDENTITY_INSERT [dbo].[УчастникиТурниров] OFF;
 
+SET IDENTITY_INSERT [dbo].[Матчи] ON;
+
 INSERT INTO [dbo].[Матчи]
 (
+    [IDМатча],
     [IDТурнира],
     [IDЭтапа],
     [НомерМатча],
     [IDКоманды1],
     [IDКоманды2],
     [IDПобедившейКоманды],
+    [IDИгрока1],
+    [IDИгрока2],
+    [IDПобедившегоИгрока],
     [СчетКоманды1],
     [СчетКоманды2],
     [ДатаМатча],
@@ -494,25 +628,17 @@ INSERT INTO [dbo].[Матчи]
     [Статус]
 )
 VALUES
-(
-    1,
-    1,
-    1,
-    1,
-    2,
-    NULL,
-    0,
-    0,
-    N'2026-05-10 18:00',
-    3,
-    N'Scheduled'
-);
+    (48, 5, 12, 1, 2, 5, NULL, NULL, NULL, NULL, 0, 0, N'05.02.2026', 3, N'Scheduled'),
+    (49, 5, 12, 2, 3, 4, NULL, NULL, NULL, NULL, 0, 0, N'05.02.2026', 3, N'Scheduled'),
+    (50, 5, 13, 3, NULL, NULL, NULL, NULL, NULL, NULL, 0, 0, N'06.02.2026', 5, N'Scheduled');
 
-INSERT INTO [dbo].[Трансляции] ([IDТурнира], [IDМатча], [Платформа], [СсылкаТрансляции])
-VALUES (1, 1, N'Twitch', N'https://twitch.tv/tournamentsdemo');
+SET IDENTITY_INSERT [dbo].[Матчи] OFF;
 
 INSERT INTO [dbo].[СпонсорыТурниров] ([IDТурнира], [IDСпонсора], [СуммаСпонсорства], [Валюта])
-VALUES (1, 1, 50000.00, N'USD');
+VALUES
+    (1, 1, 100000.00, N'USD'),
+    (1, 2, 75000.00, N'USD'),
+    (2, 3, 50000.00, N'USD');
 GO
 
 CREATE VIEW [dbo].[Organizer]

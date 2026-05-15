@@ -180,15 +180,26 @@ namespace Tournaments.WPF.Views
         private static List<NavigationItem> BuildNavigationItems(UserRole role)
         {
             List<NavigationItem> items = new List<NavigationItem>();
+            List<NavigationItem> entityItems = EntityRegistry.All
+                .Where(definition => AccessPolicy.CanAccessEntity(role, definition.TableName))
+                .Select(NavigationItem.ForEntity)
+                .ToList();
+
+            NavigationItem tournamentsItem = entityItems.FirstOrDefault(item =>
+                item.EntityDefinition != null &&
+                string.Equals(item.EntityDefinition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase));
+            if (tournamentsItem != null)
+            {
+                items.Add(tournamentsItem);
+                entityItems.Remove(tournamentsItem);
+            }
 
             if (AccessPolicy.CanAccessBracket(role))
             {
                 items.Add(NavigationItem.ForBracket());
             }
 
-            items.AddRange(EntityRegistry.All
-                .Where(definition => AccessPolicy.CanAccessEntity(role, definition.TableName))
-                .Select(NavigationItem.ForEntity));
+            items.AddRange(entityItems);
             return items;
         }
     }

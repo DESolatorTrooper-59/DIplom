@@ -365,6 +365,10 @@ namespace Tournaments.WPF.Views
             clearPreviewItem.Click += (sender, e) => ClearPreview(card);
             menu.Items.Add(clearPreviewItem);
 
+            MenuItem exportItem = new MenuItem { Header = "Экспорт данных" };
+            exportItem.Click += (sender, e) => ExportTournament(card);
+            menu.Items.Add(exportItem);
+
             menu.Items.Add(new Separator());
 
             MenuItem deleteItem = new MenuItem { Header = "Удалить турнир" };
@@ -464,14 +468,64 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            _previewStore.SetPreviewPath(card.TournamentId, dialog.FileName);
-            LoadCards();
+            try
+            {
+                _previewStore.SetPreviewPath(card.TournamentId, dialog.FileName);
+                LoadCards();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось сохранить превью: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void ClearPreview(TournamentCardViewModel card)
         {
-            _previewStore.RemovePreviewPath(card.TournamentId);
-            LoadCards();
+            try
+            {
+                _previewStore.RemovePreviewPath(card.TournamentId);
+                LoadCards();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось сбросить превью: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void ExportTournament(TournamentCardViewModel card)
+        {
+            if (card == null)
+            {
+                return;
+            }
+
+            SaveFileDialog dialog = new SaveFileDialog
+            {
+                AddExtension = true,
+                DefaultExt = ".json",
+                Filter = "JSON files (*.json)|*.json",
+                FileName = BuildTournamentExportFileName(card),
+                Title = "Экспорт данных турнира"
+            };
+
+            if (dialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            try
+            {
+                TournamentExportResult result = TournamentExportService.ExportToFile(_database, card.TournamentId, dialog.FileName, card.PreviewPath);
+                MessageBox.Show(
+                    "Экспорт данных турнира завершён. Таблиц: " + result.TableCount + ", записей: " + result.RowCount + ".",
+                    "Tournaments WPF",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось экспортировать данные турнира: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void OpenParticipantsPage()
@@ -615,6 +669,19 @@ namespace Tournaments.WPF.Views
             message.AppendLine();
             message.Append(question);
             return MessageBox.Show(message.ToString(), "Tournaments WPF", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes;
+        }
+
+        private static string BuildTournamentExportFileName(TournamentCardViewModel card)
+        {
+            string name = string.IsNullOrWhiteSpace(card.TournamentName) ? "tournament" : card.TournamentName.Trim();
+            char[] invalidChars = Path.GetInvalidFileNameChars();
+            string safeName = new string(name.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray());
+            if (string.IsNullOrWhiteSpace(safeName))
+            {
+                safeName = "tournament";
+            }
+
+            return "tournament-" + card.TournamentId.ToString(CultureInfo.InvariantCulture) + "-" + safeName + ".json";
         }
 
         private static bool Contains(string source, string query)
