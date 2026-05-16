@@ -93,6 +93,12 @@ namespace Tournaments.WPF.Views
                     return;
                 }
 
+                if (string.Equals(item.EntityDefinition.TableName, "Teams", StringComparison.OrdinalIgnoreCase))
+                {
+                    PageHost.Content = new TeamCatalogPage(_database, _crud, _role);
+                    return;
+                }
+
                 PageHost.Content = new CrudPage(_database, _crud, _database.GetEffectiveDefinition(item.EntityDefinition), _currentLogin, _role);
             }
         }

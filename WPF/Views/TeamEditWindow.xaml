@@ -1,0 +1,75 @@
+<Window x:Class="Tournaments.WPF.Views.TeamEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Добавление команды"
+        Width="520"
+        Height="520"
+        MinWidth="460"
+        MinHeight="440"
+        ResizeMode="CanMinimize"
+        WindowStartupLocation="CenterOwner">
+  <Grid Background="{DynamicResource SurfaceBrush}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <StackPanel Margin="24,24,24,10">
+      <TextBlock Text="Новая команда"
+                 FontSize="24"
+                 FontWeight="Bold"
+                 Foreground="{DynamicResource TextPrimaryBrush}" />
+      <TextBlock Margin="0,6,0,0"
+                 Text="Заполните основные данные команды."
+                 Foreground="{DynamicResource TextSecondaryBrush}" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="1"
+                  Margin="24,0,24,10"
+                  VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <TextBlock Text="Название команды *"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,6" />
+        <TextBox x:Name="TeamNameTextBox"
+                 Height="40"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Text="Страна *"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,6" />
+        <TextBox x:Name="CountryTextBox"
+                 Height="40"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Text="Тренер *"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,6" />
+        <TextBox x:Name="CoachNameTextBox"
+                 Height="40"
+                 VerticalContentAlignment="Center" />
+
+        <TextBlock Text="Дата основания *"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,6" />
+        <DatePicker x:Name="FoundedDatePicker"
+                    Height="40"
+                    SelectedDateFormat="Short" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <DockPanel Grid.Row="2" Margin="24,8,24,24">
+      <Button DockPanel.Dock="Right"
+              Width="130"
+              Height="40"
+              Content="Сохранить"
+              Click="Save_Click" />
+      <Button Width="130"
+              Height="40"
+              Content="Отмена"
+              Style="{StaticResource GhostButtonStyle}"
+              Click="Cancel_Click" />
+    </DockPanel>
+  </Grid>
+</Window>
