@@ -15,6 +15,8 @@ namespace Tournaments.WPF.Services
 
         private static readonly HashSet<string> GuestTables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
+            "Tournaments",
+            "Teams",
             "Players"
         };
 
@@ -30,7 +32,7 @@ namespace Tournaments.WPF.Services
 
         public static bool CanAccessBracket(UserRole role)
         {
-            return role == UserRole.Administrator || role == UserRole.Player || role == UserRole.Guest;
+            return role == UserRole.Administrator || role == UserRole.Player;
         }
 
         public static bool CanAccessEntity(UserRole role, string tableName)
