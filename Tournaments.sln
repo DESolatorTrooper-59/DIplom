@@ -1,10 +1,7 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.9.34728.123
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tournaments.WinForms", "Legacy\Tournaments.WinForms.csproj", "{B1DF8D0D-2936-487A-ABC9-77D2137F6711}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "WPF", "WPF", "{2481DD90-4409-10B6-4FAC-38EB559C7BC3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tournaments.WPF", "WPF\Tournaments.WPF.csproj", "{851D7B87-180C-4748-89FA-13BCC3176CD9}"
@@ -19,18 +16,6 @@ Global
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|x64.Build.0 = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Debug|x86.Build.0 = Debug|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|x64.ActiveCfg = Release|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|x64.Build.0 = Release|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|x86.ActiveCfg = Release|Any CPU
-		{B1DF8D0D-2936-487A-ABC9-77D2137F6711}.Release|x86.Build.0 = Release|Any CPU
 		{851D7B87-180C-4748-89FA-13BCC3176CD9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{851D7B87-180C-4748-89FA-13BCC3176CD9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{851D7B87-180C-4748-89FA-13BCC3176CD9}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -54,4 +39,3 @@ Global
 		SolutionGuid = {F18115BD-82F3-4883-9FA2-9C9B343C9F31}
 	EndGlobalSection
 EndGlobal
-
