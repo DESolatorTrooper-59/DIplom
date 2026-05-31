@@ -14,7 +14,7 @@ namespace Tournaments.WPF.Services
         private static readonly string ProjectDirectory = ResolveProjectDirectory();
         private static readonly string StoragePath = Path.Combine(ProjectDirectory, StorageFileName);
         private static readonly string PreviewDirectory = Path.Combine(ProjectDirectory, PreviewDirectoryName);
-        private static readonly string LegacyStoragePath = Path.Combine(
+        private static readonly string PreviousAppDataStoragePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Tournaments.WPF",
             StorageFileName);
@@ -65,9 +65,9 @@ namespace Tournaments.WPF.Services
             {
                 bool changed = false;
                 bool loaded = LoadFromFile(StoragePath, ref changed);
-                if (!loaded && !PathsEqual(StoragePath, LegacyStoragePath))
+                if (!loaded && !PathsEqual(StoragePath, PreviousAppDataStoragePath))
                 {
-                    loaded = LoadFromFile(LegacyStoragePath, ref changed);
+                    loaded = LoadFromFile(PreviousAppDataStoragePath, ref changed);
                     changed = loaded;
                 }
 

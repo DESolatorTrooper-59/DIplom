@@ -50,13 +50,13 @@ namespace Tournaments.WPF.Views
 
             if (isLeague)
             {
-                RenderLegacyLeague(canvas, snapshot.TournamentName, leagueRounds, selectedMatchId, matchClick);
+                RenderClassicLeague(canvas, snapshot.TournamentName, leagueRounds, selectedMatchId, matchClick);
                 return;
             }
 
             if (!isDouble)
             {
-                RenderLegacyMainBracket(canvas, snapshot.TournamentName, snapshot.ChampionName, mainRounds, selectedMatchId, matchClick);
+                RenderClassicMainBracket(canvas, snapshot.TournamentName, snapshot.ChampionName, mainRounds, selectedMatchId, matchClick);
                 return;
             }
 
@@ -170,7 +170,7 @@ namespace Tournaments.WPF.Views
             }
         }
 
-        private static void RenderLegacyMainBracket(Canvas canvas, string tournamentName, string championName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
+        private static void RenderClassicMainBracket(Canvas canvas, string tournamentName, string championName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
         {
             int roundCount = rounds.Count;
             int firstRoundMatches = roundCount == 0 ? 0 : rounds[0].Matches.Count;
@@ -193,10 +193,10 @@ namespace Tournaments.WPF.Views
 
             for (int roundIndex = 1; roundIndex < roundCount; roundIndex++)
             {
-                DrawLegacyRoundConnectors(canvas, rounds, roundIndex);
+                DrawClassicRoundConnectors(canvas, rounds, roundIndex);
             }
 
-            DrawLegacyChampionConnector(canvas, roundCount);
+            DrawClassicChampionConnector(canvas, roundCount);
 
             for (int roundIndex = 0; roundIndex < roundCount; roundIndex++)
             {
@@ -206,18 +206,18 @@ namespace Tournaments.WPF.Views
                     BracketMatchViewModel match = rounds[roundIndex].Matches[matchIndex];
                     Border card = CreateMatchCard(match, selectedMatchId);
                     PrepareInteractiveCard(card, match, matchClick);
-                    AddElement(canvas, card, cardLeft, GetLegacyCardTop(roundIndex, matchIndex));
+                    AddElement(canvas, card, cardLeft, GetClassicCardTop(roundIndex, matchIndex));
                 }
             }
 
             if (roundCount > 0)
             {
                 Border championCard = CreateChampionCard(championName);
-                AddElement(canvas, championCard, GetCardX(roundCount), GetLegacyMatchCenterY(roundCount - 1, 0) - ChampionHeight / 2);
+                AddElement(canvas, championCard, GetCardX(roundCount), GetClassicMatchCenterY(roundCount - 1, 0) - ChampionHeight / 2);
             }
         }
 
-        private static void RenderLegacyLeague(Canvas canvas, string tournamentName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
+        private static void RenderClassicLeague(Canvas canvas, string tournamentName, IList<BracketRoundViewModel> rounds, int? selectedMatchId, MouseButtonEventHandler matchClick)
         {
             int roundCount = rounds.Count;
             int maxMatches = roundCount == 0 ? 0 : rounds.Max(round => round.Matches.Count);
@@ -243,7 +243,7 @@ namespace Tournaments.WPF.Views
                     BracketMatchViewModel match = rounds[roundIndex].Matches[matchIndex];
                     Border card = CreateMatchCard(match, selectedMatchId);
                     PrepareInteractiveCard(card, match, matchClick);
-                    AddElement(canvas, card, cardLeft, GetLegacyLeagueCardTop(matchIndex));
+                    AddElement(canvas, card, cardLeft, GetClassicLeagueCardTop(matchIndex));
                 }
             }
         }
@@ -314,7 +314,7 @@ namespace Tournaments.WPF.Views
             return HeaderHeight + LinearSectionTopPadding + maxMatches * LinearStep + 12;
         }
 
-        private static void DrawLegacyRoundConnectors(Canvas canvas, IList<BracketRoundViewModel> rounds, int roundIndex)
+        private static void DrawClassicRoundConnectors(Canvas canvas, IList<BracketRoundViewModel> rounds, int roundIndex)
         {
             double previousRight = GetCardX(roundIndex - 1) + MatchWidth;
             double currentLeft = GetCardX(roundIndex);
@@ -323,9 +323,9 @@ namespace Tournaments.WPF.Views
 
             for (int matchIndex = 0; matchIndex < matchesInRound; matchIndex++)
             {
-                double upperY = GetLegacyMatchCenterY(roundIndex - 1, matchIndex * 2);
-                double lowerY = GetLegacyMatchCenterY(roundIndex - 1, matchIndex * 2 + 1);
-                double currentY = GetLegacyMatchCenterY(roundIndex, matchIndex);
+                double upperY = GetClassicMatchCenterY(roundIndex - 1, matchIndex * 2);
+                double lowerY = GetClassicMatchCenterY(roundIndex - 1, matchIndex * 2 + 1);
+                double currentY = GetClassicMatchCenterY(roundIndex, matchIndex);
                 DrawLine(canvas, previousRight, upperY, middleX, upperY);
                 DrawLine(canvas, previousRight, lowerY, middleX, lowerY);
                 DrawLine(canvas, middleX, upperY, middleX, lowerY);
@@ -333,7 +333,7 @@ namespace Tournaments.WPF.Views
             }
         }
 
-        private static void DrawLegacyChampionConnector(Canvas canvas, int roundCount)
+        private static void DrawClassicChampionConnector(Canvas canvas, int roundCount)
         {
             if (roundCount <= 0)
             {
@@ -342,7 +342,7 @@ namespace Tournaments.WPF.Views
 
             double finalRight = GetCardX(roundCount - 1) + MatchWidth;
             double championLeft = GetCardX(roundCount);
-            double finalY = GetLegacyMatchCenterY(roundCount - 1, 0);
+            double finalY = GetClassicMatchCenterY(roundCount - 1, 0);
             double middleX = finalRight + (championLeft - finalRight) / 2;
             DrawLine(canvas, finalRight, finalY, middleX, finalY);
             DrawLine(canvas, middleX, finalY, championLeft, finalY);
@@ -582,19 +582,19 @@ namespace Tournaments.WPF.Views
             return score.ToString(CultureInfo.InvariantCulture);
         }
 
-        private static double GetLegacyMatchCenterY(int roundIndex, int matchIndex)
+        private static double GetClassicMatchCenterY(int roundIndex, int matchIndex)
         {
             return MatchesTop + (matchIndex + 0.5) * FirstRoundStep * System.Math.Pow(2, roundIndex);
         }
 
-        private static double GetLegacyCardTop(int roundIndex, int matchIndex)
+        private static double GetClassicCardTop(int roundIndex, int matchIndex)
         {
-            return GetLegacyMatchCenterY(roundIndex, matchIndex) - MatchHeight / 2;
+            return GetClassicMatchCenterY(roundIndex, matchIndex) - MatchHeight / 2;
         }
 
-        private static double GetLegacyLeagueCardTop(int matchIndex)
+        private static double GetClassicLeagueCardTop(int matchIndex)
         {
-            return GetLegacyMatchCenterY(0, matchIndex) - MatchHeight / 2;
+            return GetClassicMatchCenterY(0, matchIndex) - MatchHeight / 2;
         }
 
         private static double GetHeaderTop(double sectionTop)
