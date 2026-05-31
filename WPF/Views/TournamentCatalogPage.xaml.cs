@@ -373,7 +373,23 @@ namespace Tournaments.WPF.Views
             participantsItem.Click += (sender, e) => OpenParticipantsPage();
             menu.Items.Add(participantsItem);
 
-            MenuItem choosePreviewItem = new MenuItem { Header = "Выбрать превью" };
+            MenuItem embeddedPreviewItem = new MenuItem { Header = "Встроенные превью" };
+            foreach (EmbeddedTournamentPreview preview in _previewStore.GetEmbeddedPreviews())
+            {
+                EmbeddedTournamentPreview selectedPreview = preview;
+                MenuItem previewItem = new MenuItem
+                {
+                    Header = selectedPreview.Title,
+                    IsCheckable = true,
+                    IsChecked = string.Equals(card.PreviewPath, selectedPreview.StorageKey, StringComparison.OrdinalIgnoreCase)
+                };
+                previewItem.Click += (sender, e) => SetEmbeddedPreview(card, selectedPreview);
+                embeddedPreviewItem.Items.Add(previewItem);
+            }
+
+            menu.Items.Add(embeddedPreviewItem);
+
+            MenuItem choosePreviewItem = new MenuItem { Header = "Выбрать файл..." };
             choosePreviewItem.Click += (sender, e) => ChoosePreview(card);
             menu.Items.Add(choosePreviewItem);
 
@@ -506,6 +522,24 @@ namespace Tournaments.WPF.Views
             catch (Exception ex)
             {
                 MessageBox.Show("Не удалось сохранить превью: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private void SetEmbeddedPreview(TournamentCardViewModel card, EmbeddedTournamentPreview preview)
+        {
+            if (card == null || preview == null)
+            {
+                return;
+            }
+
+            try
+            {
+                _previewStore.SetPreviewPath(card.TournamentId, preview.StorageKey);
+                LoadCards();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось выбрать встроенное превью: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 
@@ -825,7 +859,8 @@ namespace Tournaments.WPF.Views
 
         private static ImageSource LoadPreviewImage(string previewPath)
         {
-            if (string.IsNullOrWhiteSpace(previewPath) || !File.Exists(previewPath))
+            Uri previewUri = TournamentPreviewStore.CreatePreviewUri(previewPath);
+            if (previewUri == null)
             {
                 return null;
             }
@@ -836,7 +871,7 @@ namespace Tournaments.WPF.Views
                 image.BeginInit();
                 image.CacheOption = BitmapCacheOption.OnLoad;
                 image.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                image.UriSource = new Uri(previewPath, UriKind.Absolute);
+                image.UriSource = previewUri;
                 image.EndInit();
                 image.Freeze();
                 return image;

@@ -6,10 +6,32 @@ using System.Linq;
 
 namespace Tournaments.WPF.Services
 {
+    public sealed class EmbeddedTournamentPreview
+    {
+        public EmbeddedTournamentPreview(int tournamentId, string title, string resourcePath)
+        {
+            TournamentId = tournamentId;
+            Title = title;
+            ResourcePath = resourcePath;
+            StorageKey = EmbeddedPreviewPrefix + resourcePath.Replace('\\', '/');
+        }
+
+        internal const string EmbeddedPreviewPrefix = "embedded:";
+
+        public int TournamentId { get; }
+
+        public string Title { get; }
+
+        public string ResourcePath { get; }
+
+        public string StorageKey { get; }
+    }
+
     public sealed class TournamentPreviewStore
     {
         private const string StorageFileName = "tournament-previews.tsv";
         private const string PreviewDirectoryName = "tournament-previews";
+        private const string EmbeddedPreviewPrefix = EmbeddedTournamentPreview.EmbeddedPreviewPrefix;
 
         private static readonly string ProjectDirectory = ResolveProjectDirectory();
         private static readonly string StoragePath = Path.Combine(ProjectDirectory, StorageFileName);
@@ -18,6 +40,13 @@ namespace Tournaments.WPF.Services
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Tournaments.WPF",
             StorageFileName);
+        private static readonly IReadOnlyList<EmbeddedTournamentPreview> EmbeddedPreviews = new[]
+        {
+            new EmbeddedTournamentPreview(1, "Spring Brawl", "Assets/TournamentPreviews/tournament-1-KWTournament-TW-1.png"),
+            new EmbeddedTournamentPreview(2, "World Champion Series 2v2", "Assets/TournamentPreviews/tournament-2-2v2.png"),
+            new EmbeddedTournamentPreview(4, "World Champion Series 1v1", "Assets/TournamentPreviews/tournament-4-1v1.png"),
+            new EmbeddedTournamentPreview(5, "13 KW Preview", "Assets/TournamentPreviews/tournament-5-13-KW-Preview.webp")
+        };
 
         private readonly Dictionary<int, string> _previewPaths = new Dictionary<int, string>();
 
@@ -29,7 +58,13 @@ namespace Tournaments.WPF.Services
 
         public string GetPreviewPath(int tournamentId)
         {
-            return _previewPaths.TryGetValue(tournamentId, out string path) ? path : null;
+            if (_previewPaths.TryGetValue(tournamentId, out string path))
+            {
+                return path;
+            }
+
+            EmbeddedTournamentPreview embeddedPreview = GetDefaultEmbeddedPreview(tournamentId);
+            return embeddedPreview?.StorageKey;
         }
 
         public void SetPreviewPath(int tournamentId, string path)
@@ -41,10 +76,61 @@ namespace Tournaments.WPF.Services
             }
 
             string previousPath = GetPreviewPath(tournamentId);
+            if (IsEmbeddedPreviewPath(path))
+            {
+                _previewPaths[tournamentId] = NormalizeEmbeddedPreviewPath(path);
+                DeleteLocalPreviewFile(previousPath, path);
+                Save();
+                return;
+            }
+
             string importedPath = ImportPreviewFile(tournamentId, path);
             _previewPaths[tournamentId] = importedPath;
             DeleteLocalPreviewFile(previousPath, importedPath);
             Save();
+        }
+
+        public IReadOnlyList<EmbeddedTournamentPreview> GetEmbeddedPreviews()
+        {
+            return EmbeddedPreviews;
+        }
+
+        public static Uri CreatePreviewUri(string previewPath)
+        {
+            if (string.IsNullOrWhiteSpace(previewPath))
+            {
+                return null;
+            }
+
+            if (IsEmbeddedPreviewPath(previewPath))
+            {
+                string resourcePath = NormalizeEmbeddedPreviewPath(previewPath).Substring(EmbeddedPreviewPrefix.Length);
+                return new Uri("pack://application:,,,/" + resourcePath, UriKind.Absolute);
+            }
+
+            return File.Exists(previewPath) ? new Uri(previewPath, UriKind.Absolute) : null;
+        }
+
+        public static bool IsEmbeddedPreviewPath(string path)
+        {
+            return !string.IsNullOrWhiteSpace(path) &&
+                   path.Trim().StartsWith(EmbeddedPreviewPrefix, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static string GetPreviewFileName(string previewPath)
+        {
+            if (string.IsNullOrWhiteSpace(previewPath))
+            {
+                return null;
+            }
+
+            if (IsEmbeddedPreviewPath(previewPath))
+            {
+                string resourcePath = NormalizeEmbeddedPreviewPath(previewPath).Substring(EmbeddedPreviewPrefix.Length);
+                return resourcePath.Split('/').LastOrDefault();
+            }
+
+            return Path.GetFileName(previewPath);
         }
 
         public void RemovePreviewPath(int tournamentId)
@@ -160,6 +246,11 @@ namespace Tournaments.WPF.Services
 
         private static string ImportPreviewFile(int tournamentId, string sourcePath)
         {
+            if (IsEmbeddedPreviewPath(sourcePath))
+            {
+                return NormalizeEmbeddedPreviewPath(sourcePath);
+            }
+
             string fullSourcePath = Path.GetFullPath(sourcePath.Trim());
             if (!File.Exists(fullSourcePath))
             {
@@ -191,6 +282,7 @@ namespace Tournaments.WPF.Services
             try
             {
                 if (string.IsNullOrWhiteSpace(sourcePath) ||
+                    IsEmbeddedPreviewPath(sourcePath) ||
                     !File.Exists(sourcePath) ||
                     IsInsideDirectory(sourcePath, PreviewDirectory))
                 {
@@ -210,6 +302,7 @@ namespace Tournaments.WPF.Services
             try
             {
                 if (string.IsNullOrWhiteSpace(path) ||
+                    IsEmbeddedPreviewPath(path) ||
                     PathsEqual(path, pathToKeep) ||
                     !IsInsideDirectory(path, PreviewDirectory) ||
                     !File.Exists(path))
@@ -231,6 +324,11 @@ namespace Tournaments.WPF.Services
                 return null;
             }
 
+            if (IsEmbeddedPreviewPath(path))
+            {
+                return NormalizeEmbeddedPreviewPath(path);
+            }
+
             return Path.IsPathRooted(path)
                 ? Path.GetFullPath(path)
                 : Path.GetFullPath(Path.Combine(ProjectDirectory, path));
@@ -241,6 +339,11 @@ namespace Tournaments.WPF.Services
             if (string.IsNullOrWhiteSpace(path))
             {
                 return string.Empty;
+            }
+
+            if (IsEmbeddedPreviewPath(path))
+            {
+                return NormalizeEmbeddedPreviewPath(path);
             }
 
             string fullPath = Path.GetFullPath(path);
@@ -301,6 +404,14 @@ namespace Tournaments.WPF.Services
                 return false;
             }
 
+            if (IsEmbeddedPreviewPath(firstPath) || IsEmbeddedPreviewPath(secondPath))
+            {
+                return string.Equals(
+                    NormalizeEmbeddedPreviewPath(firstPath),
+                    NormalizeEmbeddedPreviewPath(secondPath),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
             try
             {
                 return string.Equals(
@@ -312,6 +423,24 @@ namespace Tournaments.WPF.Services
             {
                 return string.Equals(firstPath, secondPath, StringComparison.OrdinalIgnoreCase);
             }
+        }
+
+        private static EmbeddedTournamentPreview GetDefaultEmbeddedPreview(int tournamentId)
+        {
+            return EmbeddedPreviews.FirstOrDefault(preview => preview.TournamentId == tournamentId);
+        }
+
+        private static string NormalizeEmbeddedPreviewPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            string trimmed = path.Trim().Replace('\\', '/');
+            return trimmed.StartsWith(EmbeddedPreviewPrefix, StringComparison.OrdinalIgnoreCase)
+                ? EmbeddedPreviewPrefix + trimmed.Substring(EmbeddedPreviewPrefix.Length)
+                : trimmed;
         }
 
         private static string MakeSafeFileName(string value)

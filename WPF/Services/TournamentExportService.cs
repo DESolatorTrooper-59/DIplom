@@ -142,7 +142,7 @@ namespace Tournaments.WPF.Services
                 "tournamentId", tournamentId,
                 "preview", Object(
                     "path", string.IsNullOrWhiteSpace(previewPath) ? null : previewPath,
-                    "fileName", string.IsNullOrWhiteSpace(previewPath) ? null : Path.GetFileName(previewPath)),
+                    "fileName", string.IsNullOrWhiteSpace(previewPath) ? null : TournamentPreviewStore.GetPreviewFileName(previewPath)),
                 "counts", counts,
                 "tables", tables);
         }

@@ -12,6 +12,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="Assets\TournamentPreviews\**\*.*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
   </ItemGroup>
