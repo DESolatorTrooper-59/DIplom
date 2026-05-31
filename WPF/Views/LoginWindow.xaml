@@ -368,6 +368,7 @@
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
               <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
               <RowDefinition Height="*" />
               <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
@@ -382,7 +383,23 @@
                      Height="38"
                      KeyDown="RegisterInput_KeyDown" />
 
-            <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Border Grid.Row="2"
+                    x:Name="RegisterMessageContainer"
+                    Margin="0,10,0,2"
+                    Padding="12"
+                    Background="{DynamicResource MessageErrorBackgroundBrush}"
+                    BorderBrush="{DynamicResource MessageErrorBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Visibility="Collapsed">
+              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="76">
+                <TextBlock x:Name="RegisterMessageText"
+                           Foreground="{DynamicResource MessageErrorForegroundBrush}"
+                           TextWrapping="Wrap" />
+              </ScrollViewer>
+            </Border>
+
+            <Grid Grid.Row="3" Margin="0,10,0,0">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="16" />
@@ -411,12 +428,12 @@
               </StackPanel>
             </Grid>
 
-            <TextBlock Grid.Row="3"
+            <TextBlock Grid.Row="4"
                        Text="Пароль"
                        FontWeight="SemiBold"
                        Margin="0,12,0,6"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
-            <Grid Grid.Row="4">
+            <Grid Grid.Row="5">
               <PasswordBox x:Name="RegisterPasswordTextBox"
                            Height="38"
                            KeyDown="RegisterInput_KeyDown"
@@ -428,12 +445,12 @@
                        Visibility="Collapsed" />
             </Grid>
 
-            <TextBlock Grid.Row="5"
+            <TextBlock Grid.Row="6"
                        Text="Подтвердите пароль"
                        FontWeight="SemiBold"
                        Margin="0,12,0,6"
                        Foreground="{DynamicResource TextPrimaryBrush}" />
-            <Grid Grid.Row="6">
+            <Grid Grid.Row="7">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="12" />
@@ -461,23 +478,7 @@
                       Click="RegisterTogglePasswordVisibility_Click" />
             </Grid>
 
-            <Border Grid.Row="7"
-                    x:Name="RegisterMessageContainer"
-                    Margin="0,12,0,16"
-                    Padding="12"
-                    Background="{DynamicResource MessageErrorBackgroundBrush}"
-                    BorderBrush="{DynamicResource MessageErrorBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="10"
-                    Visibility="Collapsed">
-              <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="100">
-                <TextBlock x:Name="RegisterMessageText"
-                           Foreground="{DynamicResource MessageErrorForegroundBrush}"
-                           TextWrapping="Wrap" />
-              </ScrollViewer>
-            </Border>
-
-            <Grid Grid.Row="8" HorizontalAlignment="Stretch">
+            <Grid Grid.Row="9" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="12" />
