@@ -29,7 +29,7 @@ namespace Tournaments.WPF.Views
             _teamsDefinition = _database.GetEffectiveDefinition(EntityRegistry.All.First(definition => string.Equals(definition.TableName, "Teams", StringComparison.OrdinalIgnoreCase)));
             _teamPlayersDefinition = _database.GetEffectiveDefinition(EntityRegistry.All.First(definition => string.Equals(definition.TableName, "TeamPlayers", StringComparison.OrdinalIgnoreCase)));
 
-            CreateButton.Visibility = CanManageData ? Visibility.Visible : Visibility.Collapsed;
+            CreateButton.Visibility = CanCreateTeams ? Visibility.Visible : Visibility.Collapsed;
             SubtitleText.Text = BuildSubtitle();
             Loaded += TeamCatalogPage_Loaded;
         }
@@ -37,6 +37,11 @@ namespace Tournaments.WPF.Views
         private bool CanManageData
         {
             get { return AccessPolicy.CanManageData(_currentRole); }
+        }
+
+        private bool CanCreateTeams
+        {
+            get { return AccessPolicy.CanCreateTeams(_currentRole); }
         }
 
         private void TeamCatalogPage_Loaded(object sender, RoutedEventArgs e)
@@ -129,7 +134,7 @@ namespace Tournaments.WPF.Views
 
         private void CreateButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!CanManageData)
+            if (!CanCreateTeams)
             {
                 return;
             }
@@ -309,6 +314,8 @@ namespace Tournaments.WPF.Views
             {
                 case UserRole.Administrator:
                     return "Карточки команд с быстрым управлением составом, удалением и переименованием.";
+                case UserRole.Organizer:
+                    return "Просматривайте команды и создавайте новые составы для турниров.";
                 default:
                     return "Просматривайте команды и их участников в карточном формате.";
             }

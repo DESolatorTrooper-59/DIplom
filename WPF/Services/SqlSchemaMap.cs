@@ -7,7 +7,7 @@ namespace Tournaments.WPF.Services
         private static readonly IReadOnlyDictionary<string, string> TableNames =
             new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase)
             {
-                ["Organizer"] = "Организаторы",
+                ["Roles"] = "Роли",
                 ["GameTitles"] = "Игры",
                 ["Teams"] = "Команды",
                 ["Players"] = "Игроки",
@@ -24,9 +24,9 @@ namespace Tournaments.WPF.Services
         private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> ColumnNames =
             new Dictionary<string, IReadOnlyDictionary<string, string>>(System.StringComparer.OrdinalIgnoreCase)
             {
-                ["Organizer"] = CreateColumns(
-                    ("Login", "Логин"),
-                    ("Password", "Пароль")),
+                ["Roles"] = CreateColumns(
+                    ("RoleID", "IDРоли"),
+                    ("RoleName", "НазваниеРоли")),
                 ["GameTitles"] = CreateColumns(
                     ("GameID", "IDИгры"),
                     ("GameName", "НазваниеИгры"),
@@ -46,7 +46,8 @@ namespace Tournaments.WPF.Services
                     ("RealName", "НастоящееИмя"),
                     ("Country", "Страна"),
                     ("BirthDate", "ДатаРождения"),
-                    ("Password", "Пароль")),
+                    ("Password", "Пароль"),
+                    ("RoleID", "IDРоли")),
                 ["Sponsors"] = CreateColumns(
                     ("SponsorID", "IDСпонсора"),
                     ("SponsorName", "НазваниеСпонсора"),

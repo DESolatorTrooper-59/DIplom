@@ -4,6 +4,7 @@ namespace Tournaments.WPF.Models
     {
         Guest = 0,
         Player = 1,
-        Administrator = 2
+        Organizer = 2,
+        Administrator = 3
     }
 }

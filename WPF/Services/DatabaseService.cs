@@ -11,6 +11,9 @@ namespace Tournaments.WPF.Services
     {
         private const string HiddenPlayerName = "Скрыто";
         private const string UnspecifiedCountry = "Не указано";
+        private const int PlayerRoleId = 1;
+        private const int OrganizerRoleId = 2;
+        private const int AdministratorRoleId = 3;
         private readonly IDataBackend _backend;
         private readonly Dictionary<string, IReadOnlyCollection<string>> _columnsCache = new Dictionary<string, IReadOnlyCollection<string>>(StringComparer.OrdinalIgnoreCase);
 
@@ -42,27 +45,20 @@ namespace Tournaments.WPF.Services
 
         public bool ValidateLogin(string login, string password)
         {
-            return _backend.ValidateLogin(login, password);
+            return AuthenticateUser(login, password).HasValue;
         }
 
         public UserRole? AuthenticateUser(string login, string password)
         {
-            if (_backend.ValidateOrganizerLogin(login, password))
+            DataRow row = GetPlayerRowByNickname(login);
+            if (row == null || !row.Table.Columns.Contains("Password") || row["Password"] == DBNull.Value)
             {
-                return UserRole.Administrator;
+                return null;
             }
 
-            if (_backend.ValidatePlayerLogin(login, password))
-            {
-                return UserRole.Player;
-            }
-
-            return null;
-        }
-
-        public void EnsureOrganizerUser(string login, string password)
-        {
-            _backend.EnsureOrganizerUser(login, password);
+            return PasswordHasher.VerifyPassword(password, Convert.ToString(row["Password"]))
+                ? ResolveUserRole(row)
+                : (UserRole?)null;
         }
 
         public void RegisterPlayer(string nickname, DateTime birthDate, string realName, string password)
@@ -91,18 +87,14 @@ namespace Tournaments.WPF.Services
                 throw new InvalidOperationException("Игрок с таким никнеймом уже существует.");
             }
 
-            if (RecordExists("Organizer", "Login", normalizedNickname))
-            {
-                throw new InvalidOperationException("Этот никнейм уже занят учетной записью администратора.");
-            }
-
             Insert("Players", new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
             {
                 ["Nickname"] = normalizedNickname,
                 ["RealName"] = normalizedRealName,
                 ["Country"] = UnspecifiedCountry,
                 ["BirthDate"] = birthDate.Date,
-                ["Password"] = PasswordHasher.HashPassword(normalizedPassword)
+                ["Password"] = PasswordHasher.HashPassword(normalizedPassword),
+                ["RoleID"] = PlayerRoleId
             });
         }
 
@@ -111,7 +103,8 @@ namespace Tournaments.WPF.Services
             switch (role)
             {
                 case UserRole.Player:
-                    return GetPlayerProfile(login);
+                case UserRole.Organizer:
+                    return GetPlayerProfile(login, role);
                 case UserRole.Administrator:
                     return GetAdministratorProfile(login);
                 default:
@@ -130,6 +123,10 @@ namespace Tournaments.WPF.Services
             {
                 case UserRole.Player:
                     return UpdatePlayerProfile(currentLogin, nickname, realName, country, birthDate, newPassword);
+                case UserRole.Organizer:
+                    string updatedLogin = UpdatePlayerProfile(currentLogin, nickname, realName, country, birthDate, newPassword);
+                    UpdateOrganizerTournamentOwnership(currentLogin, updatedLogin);
+                    return updatedLogin;
                 case UserRole.Administrator:
                     UpdateAdministratorPassword(currentLogin, newPassword);
                     return currentLogin;
@@ -268,8 +265,8 @@ namespace Tournaments.WPF.Services
             }
 
             _backend.EnsurePasswordStorage();
-            ValidateRequiredColumns("Organizer", "Login", "Password");
-            ValidateRequiredColumns("Players", "Password");
+            ValidateRequiredColumns("Roles", "RoleID", "RoleName");
+            ValidateRequiredColumns("Players", "Password", "RoleID");
             foreach (EntityDefinition definition in EntityRegistry.All)
             {
                 IReadOnlyCollection<string> columns = GetAvailableColumns(definition.TableName);
@@ -670,7 +667,7 @@ namespace Tournaments.WPF.Services
             return values;
         }
 
-        private UserProfileData GetPlayerProfile(string login)
+        private UserProfileData GetPlayerProfile(string login, UserRole role)
         {
             DataRow row = GetPlayerRowByNickname(login);
             if (row == null)
@@ -678,7 +675,7 @@ namespace Tournaments.WPF.Services
                 throw new InvalidOperationException("Профиль игрока не найден.");
             }
 
-            return new UserProfileData(UserRole.Player, login)
+            return new UserProfileData(role, login)
             {
                 Nickname = Convert.ToString(row["Nickname"]),
                 RealName = row.Table.Columns.Contains("RealName") && row["RealName"] != DBNull.Value ? Convert.ToString(row["RealName"]) : string.Empty,
@@ -691,7 +688,7 @@ namespace Tournaments.WPF.Services
 
         private UserProfileData GetAdministratorProfile(string login)
         {
-            DataRow row = GetOrganizerRow(login);
+            DataRow row = GetPlayerRowByNickname(login);
             if (row == null)
             {
                 throw new InvalidOperationException("Профиль администратора не найден.");
@@ -738,12 +735,6 @@ namespace Tournaments.WPF.Services
                 throw new InvalidOperationException("Игрок с таким никнеймом уже существует.");
             }
 
-            if (!string.Equals(currentLogin, normalizedNickname, StringComparison.OrdinalIgnoreCase) &&
-                RecordExists("Organizer", "Login", normalizedNickname))
-            {
-                throw new InvalidOperationException("Этот никнейм уже занят учетной записью администратора.");
-            }
-
             string passwordToSave = string.IsNullOrWhiteSpace(newPassword)
                 ? Convert.ToString(row["Password"])
                 : PasswordHasher.HashPassword(newPassword);
@@ -773,22 +764,54 @@ namespace Tournaments.WPF.Services
                 return;
             }
 
-            DataRow row = GetOrganizerRow(currentLogin);
+            DataRow row = GetPlayerRowByNickname(currentLogin);
             if (row == null)
             {
                 throw new InvalidOperationException("Профиль администратора не найден.");
             }
 
-            Update("Organizer",
-                new[] { "Login" },
+            Update("Players",
+                new[] { "PlayerID" },
                 new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["Password"] = PasswordHasher.HashPassword(newPassword)
                 },
                 new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["Login"] = currentLogin
+                    ["PlayerID"] = Convert.ToInt32(row["PlayerID"])
                 });
+        }
+
+        private void UpdateOrganizerTournamentOwnership(string oldLogin, string newLogin)
+        {
+            if (string.IsNullOrWhiteSpace(oldLogin) ||
+                string.IsNullOrWhiteSpace(newLogin) ||
+                string.Equals(oldLogin, newLogin, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            DataTable tournaments = GetTable("Tournaments");
+            foreach (DataRow tournament in tournaments.Rows.Cast<DataRow>())
+            {
+                if (!tournament.Table.Columns.Contains("Organizer") ||
+                    tournament["Organizer"] == DBNull.Value ||
+                    !string.Equals(Convert.ToString(tournament["Organizer"]), oldLogin, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                Update("Tournaments",
+                    new[] { "TournamentID" },
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["Organizer"] = newLogin
+                    },
+                    new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["TournamentID"] = Convert.ToInt32(tournament["TournamentID"])
+                    });
+            }
         }
 
         private bool NicknameExistsForAnotherPlayer(string nickname, int currentPlayerId)
@@ -812,14 +835,47 @@ namespace Tournaments.WPF.Services
                     string.Equals(Convert.ToString(row["Nickname"]), nickname, StringComparison.OrdinalIgnoreCase));
         }
 
-        private DataRow GetOrganizerRow(string login)
+        private UserRole ResolveUserRole(DataRow playerRow)
         {
-            DataTable organizers = GetTable("Organizer");
-            return organizers.Rows
+            int? roleId = playerRow.Table.Columns.Contains("RoleID") && playerRow["RoleID"] != DBNull.Value
+                ? Convert.ToInt32(playerRow["RoleID"])
+                : (int?)null;
+
+            if (!roleId.HasValue)
+            {
+                return UserRole.Player;
+            }
+
+            switch (roleId.Value)
+            {
+                case AdministratorRoleId:
+                    return UserRole.Administrator;
+                case OrganizerRoleId:
+                    return UserRole.Organizer;
+                case PlayerRoleId:
+                    return UserRole.Player;
+            }
+
+            DataTable roles = GetTable("Roles");
+            DataRow roleRow = roles.Rows
                 .Cast<DataRow>()
-                .FirstOrDefault(row =>
-                    row["Login"] != DBNull.Value &&
-                    string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase));
+                .FirstOrDefault(row => row.Table.Columns.Contains("RoleID") && row["RoleID"] != DBNull.Value && Convert.ToInt32(row["RoleID"]) == roleId.Value);
+
+            string roleName = roleRow != null && roleRow.Table.Columns.Contains("RoleName") && roleRow["RoleName"] != DBNull.Value
+                ? Convert.ToString(roleRow["RoleName"])
+                : string.Empty;
+
+            if (string.Equals(roleName, "Администратор", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return UserRole.Administrator;
+            }
+
+            if (string.Equals(roleName, "Организатор", StringComparison.CurrentCultureIgnoreCase))
+            {
+                return UserRole.Organizer;
+            }
+
+            return UserRole.Player;
         }
     }
 }

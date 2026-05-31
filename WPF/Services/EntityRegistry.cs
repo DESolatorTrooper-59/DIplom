@@ -11,6 +11,7 @@ namespace Tournaments.WPF.Services
         {
             List<EntityDefinition> definitions = new List<EntityDefinition>
             {
+                CreateRolesDefinition(),
                 CreateTeamsDefinition(),
                 CreatePlayersDefinition(),
                 CreateGamesDefinition(),

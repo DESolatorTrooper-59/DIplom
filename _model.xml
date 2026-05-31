@@ -102,6 +102,21 @@
 			</Relationship>
 			<Annotation Type="SqlInlineConstraintAnnotation" Name="[dbo].[DF__TeamPlaye__IsAct__3F466844]" Disambiguator="9" />
 		</Element>
+		<Element Type="SqlDefaultConstraint" Name="[dbo].[DF_Players_RoleID]">
+			<Property Name="DefaultExpressionScript">
+				<Value><![CDATA[((1))]]></Value>
+			</Property>
+			<Relationship Name="DefiningTable">
+				<Entry>
+					<References Name="[dbo].[Players]" />
+				</Entry>
+			</Relationship>
+			<Relationship Name="ForColumn">
+				<Entry>
+					<References Name="[dbo].[Players].[RoleID]" />
+				</Entry>
+			</Relationship>
+		</Element>
 		<Element Type="SqlDefaultConstraint">
 			<Property Name="DefaultExpressionScript">
 				<Value><![CDATA[((5))]]></Value>
@@ -542,6 +557,46 @@
 			<Annotation Type="IsNotTrustedPropertyAnnotation" />
 			<Annotation Type="SqlInlineConstraintAnnotation" Name="[dbo].[FK__Tournamen__Spons__71D1E811]" Disambiguator="29" />
 		</Element>
+		<Element Type="SqlForeignKeyConstraint" Name="[dbo].[FK_Players_Roles]">
+			<Relationship Name="Columns">
+				<Entry>
+					<References Name="[dbo].[Players].[RoleID]" />
+				</Entry>
+			</Relationship>
+			<Relationship Name="DefiningTable">
+				<Entry>
+					<References Name="[dbo].[Players]" />
+				</Entry>
+			</Relationship>
+			<Relationship Name="ForeignColumns">
+				<Entry>
+					<References Name="[dbo].[Roles].[RoleID]" />
+				</Entry>
+			</Relationship>
+			<Relationship Name="ForeignTable">
+				<Entry>
+					<References Name="[dbo].[Roles]" />
+				</Entry>
+			</Relationship>
+		</Element>
+		<Element Type="SqlPrimaryKeyConstraint" Name="[dbo].[PK_Roles]">
+			<Relationship Name="ColumnSpecifications">
+				<Entry>
+					<Element Type="SqlIndexedColumnSpecification">
+						<Relationship Name="Column">
+							<Entry>
+								<References Name="[dbo].[Roles].[RoleID]" />
+							</Entry>
+						</Relationship>
+					</Element>
+				</Entry>
+			</Relationship>
+			<Relationship Name="DefiningTable">
+				<Entry>
+					<References Name="[dbo].[Roles]" />
+				</Entry>
+			</Relationship>
+		</Element>
 		<Element Type="SqlPrimaryKeyConstraint">
 			<Relationship Name="ColumnSpecifications">
 				<Entry>
@@ -778,6 +833,24 @@
 				</Entry>
 			</Relationship>
 			<Annotation Type="SqlInlineConstraintAnnotation" Name="[dbo].[UQ__Players__CC6CD17EE9EC7BC8]" Disambiguator="41" />
+		</Element>
+		<Element Type="SqlUniqueConstraint" Name="[dbo].[UQ_Roles_RoleName]">
+			<Relationship Name="ColumnSpecifications">
+				<Entry>
+					<Element Type="SqlIndexedColumnSpecification">
+						<Relationship Name="Column">
+							<Entry>
+								<References Name="[dbo].[Roles].[RoleName]" />
+							</Entry>
+						</Relationship>
+					</Element>
+				</Entry>
+			</Relationship>
+			<Relationship Name="DefiningTable">
+				<Entry>
+					<References Name="[dbo].[Roles]" />
+				</Entry>
+			</Relationship>
 		</Element>
 		<Element Type="SqlUniqueConstraint">
 			<Relationship Name="ColumnSpecifications">
@@ -1382,11 +1455,31 @@ END;]]></Value>
 			<AttachedAnnotation Disambiguator="25" />
 			<AttachedAnnotation Disambiguator="37" />
 		</Element>
-		<Element Type="SqlTable" Name="[dbo].[Organizer]">
+		<Element Type="SqlTable" Name="[dbo].[Roles]">
 			<Property Name="IsAnsiNullsOn" Value="True" />
 			<Relationship Name="Columns">
 				<Entry>
-					<Element Type="SqlSimpleColumn" Name="[dbo].[Organizer].[Login]">
+					<Element Type="SqlSimpleColumn" Name="[dbo].[Roles].[RoleID]">
+						<Property Name="IsNullable" Value="False" />
+						<Property Name="IsIdentity" Value="True" />
+						<Relationship Name="TypeSpecifier">
+							<Entry>
+								<Element Type="SqlTypeSpecifier">
+									<Relationship Name="Type">
+										<Entry>
+											<References ExternalSource="BuiltIns" Name="[int]" />
+										</Entry>
+									</Relationship>
+								</Element>
+							</Entry>
+						</Relationship>
+						<Annotation Type="OnlinePropertyAnnotation" Name="[LastValue]">
+							<Property Name="Value" Value="3" />
+						</Annotation>
+					</Element>
+				</Entry>
+				<Entry>
+					<Element Type="SqlSimpleColumn" Name="[dbo].[Roles].[RoleName]">
 						<Property Name="IsNullable" Value="False" />
 						<Relationship Name="TypeSpecifier">
 							<Entry>
@@ -1402,44 +1495,10 @@ END;]]></Value>
 						</Relationship>
 					</Element>
 				</Entry>
-				<Entry>
-					<Element Type="SqlSimpleColumn" Name="[dbo].[Organizer].[Password]">
-						<Relationship Name="TypeSpecifier">
-							<Entry>
-								<Element Type="SqlTypeSpecifier">
-									<Property Name="Length" Value="128" />
-									<Relationship Name="Type">
-										<Entry>
-											<References ExternalSource="BuiltIns" Name="[nvarchar]" />
-										</Entry>
-									</Relationship>
-								</Element>
-							</Entry>
-						</Relationship>
-					</Element>
-				</Entry>
 			</Relationship>
 			<Relationship Name="Schema">
 				<Entry>
 					<References ExternalSource="BuiltIns" Name="[dbo]" />
-				</Entry>
-			</Relationship>
-		</Element>
-		<Element Type="SqlPrimaryKeyConstraint" Name="[dbo].[PK_Organizer]">
-			<Relationship Name="ColumnSpecifications">
-				<Entry>
-					<Element Type="SqlIndexedColumnSpecification">
-						<Relationship Name="Column">
-							<Entry>
-								<References Name="[dbo].[Organizer].[Login]" />
-							</Entry>
-						</Relationship>
-					</Element>
-				</Entry>
-			</Relationship>
-			<Relationship Name="DefiningTable">
-				<Entry>
-					<References Name="[dbo].[Organizer]" />
 				</Entry>
 			</Relationship>
 		</Element>
@@ -1523,6 +1582,38 @@ END;]]></Value>
 									<Relationship Name="Type">
 										<Entry>
 											<References ExternalSource="BuiltIns" Name="[date]" />
+										</Entry>
+									</Relationship>
+								</Element>
+							</Entry>
+						</Relationship>
+					</Element>
+				</Entry>
+				<Entry>
+					<Element Type="SqlSimpleColumn" Name="[dbo].[Players].[Password]">
+						<Relationship Name="TypeSpecifier">
+							<Entry>
+								<Element Type="SqlTypeSpecifier">
+									<Property Name="Length" Value="128" />
+									<Relationship Name="Type">
+										<Entry>
+											<References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</Entry>
+									</Relationship>
+								</Element>
+							</Entry>
+						</Relationship>
+					</Element>
+				</Entry>
+				<Entry>
+					<Element Type="SqlSimpleColumn" Name="[dbo].[Players].[RoleID]">
+						<Property Name="IsNullable" Value="False" />
+						<Relationship Name="TypeSpecifier">
+							<Entry>
+								<Element Type="SqlTypeSpecifier">
+									<Relationship Name="Type">
+										<Entry>
+											<References ExternalSource="BuiltIns" Name="[int]" />
 										</Entry>
 									</Relationship>
 								</Element>

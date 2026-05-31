@@ -21,12 +21,6 @@ namespace Tournaments.WPF.Services
 
         bool ValidateLogin(string login, string password);
 
-        bool ValidateOrganizerLogin(string login, string password);
-
-        bool ValidatePlayerLogin(string login, string password);
-
-        void EnsureOrganizerUser(string login, string password);
-
         bool RecordExists(string tableName, string columnName, object value);
 
         int CountRows(string tableName, Func<DataRow, bool> predicate);

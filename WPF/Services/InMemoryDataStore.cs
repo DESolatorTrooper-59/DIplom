@@ -23,50 +23,27 @@ namespace Tournaments.WPF.Services
 
         public static InMemoryDataStore Instance => _instance.Value;
 
-        public void EnsureUser(string login, string password)
+        public void EnsureUser(string login, string password, int roleId)
         {
             lock (_syncRoot)
             {
-                DataTable organizers = GetRequiredTable("Organizer");
-                bool exists = organizers.Rows
+                DataTable players = GetRequiredTable("Players");
+                bool exists = players.Rows
                     .Cast<DataRow>()
                     .Any(row =>
-                        !IsNull(row["Login"]) &&
-                        string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase));
+                        !IsNull(row["Nickname"]) &&
+                        string.Equals(Convert.ToString(row["Nickname"]), login, StringComparison.OrdinalIgnoreCase));
 
                 if (exists)
                 {
                     return;
                 }
 
-                DataRow organizer = organizers.NewRow();
-                organizer["Login"] = login;
-                organizer["Password"] = PasswordHasher.HashPassword(password);
-                organizers.Rows.Add(organizer);
+                SeedPlayer(NextIdentity("Players"), login, login, "Online", new DateTime(1970, 1, 1), PasswordHasher.HashPassword(password), roleId);
             }
         }
 
         public bool ValidateUser(string login, string password)
-        {
-            return ValidateOrganizerUser(login, password) || ValidatePlayerUser(login, password);
-        }
-
-        public bool ValidateOrganizerUser(string login, string password)
-        {
-            lock (_syncRoot)
-            {
-                DataTable organizers = GetRequiredTable("Organizer");
-                return organizers.Rows
-                    .Cast<DataRow>()
-                    .Any(row =>
-                        !IsNull(row["Login"]) &&
-                        !IsNull(row["Password"]) &&
-                        string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase) &&
-                        PasswordHasher.VerifyPassword(password, Convert.ToString(row["Password"])));
-            }
-        }
-
-        public bool ValidatePlayerUser(string login, string password)
         {
             lock (_syncRoot)
             {
@@ -541,9 +518,9 @@ namespace Tournaments.WPF.Services
         }
         private void InitializeSchema()
         {
-            CreateTable("Organizer", null,
-                Column("Login", typeof(string)),
-                Column("Password", typeof(string)));
+            CreateTable("Roles", "RoleID",
+                Column("RoleID", typeof(int)),
+                Column("RoleName", typeof(string)));
 
             CreateTable("GameTitles", "GameID",
                 Column("GameID", typeof(int)),
@@ -575,7 +552,8 @@ namespace Tournaments.WPF.Services
                 Column("RealName", typeof(string)),
                 Column("Country", typeof(string)),
                 Column("BirthDate", typeof(DateTime)),
-                Column("Password", typeof(string)));
+                Column("Password", typeof(string)),
+                Column("RoleID", typeof(int)));
 
             CreateTable("Sponsors", "SponsorID",
                 Column("SponsorID", typeof(int)),
@@ -643,8 +621,11 @@ namespace Tournaments.WPF.Services
 
         private void SeedData()
         {
-            EnsureUser("admin", "password");
-            EnsureUser("organizer", "organizer");
+            SeedRole(1, "Игрок");
+            SeedRole(2, "Организатор");
+            SeedRole(3, "Администратор");
+            EnsureUser("admin", "password", 3);
+            EnsureUser("organizer", "organizer", 2);
 
             SeedRow("GameTitles", new Dictionary<string, object>
             {
@@ -696,6 +677,7 @@ namespace Tournaments.WPF.Services
             SeedTeam(3, "Bartjones team", new DateTime(2026, 4, 28), "Online", "Bartjones", new DateTime(2026, 5, 15));
             SeedTeam(4, "Bookuha team", new DateTime(2026, 4, 27), "Online", "Bookuha", new DateTime(2026, 5, 15));
             SeedTeam(5, "DavidZD team", new DateTime(2026, 5, 1), "Online", "DavidZD", new DateTime(2026, 5, 15));
+            SeedTeam(6, "Neiroslop", new DateTime(2026, 5, 16), "Online", "AI", new DateTime(2026, 5, 16, 21, 16, 23));
 
             SeedPlayer(3, "DESolatorTrooper", "Sergey Kornev", "Russia", new DateTime(2005, 6, 21));
             SeedPlayer(4, "Bookuha", "Andrey", "Ukraine", new DateTime(2000, 1, 1));
@@ -738,18 +720,30 @@ namespace Tournaments.WPF.Services
                 ["Industry"] = "Peripherals"
             });
 
-            SeedTournament(1, "Spring Invitational 2026", 1, new DateTime(2026, 5, 10), new DateTime(2026, 5, 12), 150000m, "admin", "Online", "Double Elimination", 8, "Игроки");
+            SeedTeamPlayer(3, 3, 20, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(4, 3, 13, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(5, 3, 8, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(6, 2, 19, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(7, 2, 9, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(8, 2, 3, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(9, 2, 21, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(10, 6, 16, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(11, 6, 17, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(12, 6, 6, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(13, 6, 20, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(14, 6, 7, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(15, 6, 12, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(16, 6, 8, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(17, 6, 13, new DateTime(2026, 5, 16));
+            SeedTeamPlayer(18, 6, 3, new DateTime(2026, 5, 16));
+
+            SeedTournament(1, "Spring Invitational 2026", 1, new DateTime(2026, 5, 10), new DateTime(2026, 5, 12), 150000m, "admin", "Moscow", "Double Elimination", 10, "Игроки");
             SeedTournament(2, "WEC Season 1", 3, new DateTime(2026, 2, 1), null, 1000m, "Bikerushownz", "Online", "League", 8, "Игроки");
             SeedTournament(3, "WEC Season 2", 3, new DateTime(2026, 3, 1), null, 1000m, "Bikerushownz", "Online", "League", 24, "Игроки");
             SeedTournament(4, "Red Champions", 5, new DateTime(2024, 7, 5), new DateTime(2024, 8, 16), 1m, "MoscowCypersports", "Online", "Single Elimination", 24, "Игроки");
-            SeedTournament(5, "WEC Team Cup", 3, new DateTime(2026, 2, 5), new DateTime(2026, 2, 6), 0m, "admin", "Online", "Single Elimination", 8, "Команды");
+            SeedTournament(5, "4v4 ZanekiPrivateTournament", 3, new DateTime(2026, 2, 5), new DateTime(2026, 2, 7), 100m, "Zaneki", "Online", "Single Elimination", 4, "Команды");
 
             SeedTournamentStage(1, 1, "Playoffs", 1, "Winner");
-            SeedTournamentStage(2, 4, "Bracket - Round of 32", 100, "Winner");
-            SeedTournamentStage(3, 4, "Bracket - Round of 16", 101, "Winner");
-            SeedTournamentStage(4, 4, "Bracket - Quarterfinals", 102, "Winner");
-            SeedTournamentStage(5, 4, "Bracket - Semifinals", 103, "Winner");
-            SeedTournamentStage(6, 4, "Bracket - Grand Final", 104, "Final");
             SeedTournamentStage(7, 2, "League - Round 1", 400, DBNull.Value);
             SeedTournamentStage(8, 2, "League - Round 2", 401, DBNull.Value);
             SeedTournamentStage(9, 2, "League - Round 3", 402, DBNull.Value);
@@ -784,6 +778,11 @@ namespace Tournaments.WPF.Services
             SeedTournamentStage(38, 1, "Bracket - Lower - Round 3", 202, "Loser");
             SeedTournamentStage(39, 1, "Bracket - Lower - Final", 203, "Loser");
             SeedTournamentStage(40, 1, "Bracket - Grand Final", 300, "Final");
+            SeedTournamentStage(41, 4, "Bracket - Round of 32", 100, "Winner");
+            SeedTournamentStage(42, 4, "Bracket - Round of 16", 101, "Winner");
+            SeedTournamentStage(43, 4, "Bracket - Quarterfinals", 102, "Winner");
+            SeedTournamentStage(44, 4, "Bracket - Semifinals", 103, "Winner");
+            SeedTournamentStage(45, 4, "Bracket - Grand Final", 104, "Final");
 
             SeedTournamentParticipant(1, 1, 1, 1, null, null);
             SeedTournamentParticipant(2, 1, 2, 2, null, null);
@@ -883,7 +882,16 @@ namespace Tournaments.WPF.Services
             });
         }
 
-        private void SeedPlayer(int playerId, string nickname, string realName, string country, DateTime birthDate)
+        private void SeedRole(int roleId, string roleName)
+        {
+            SeedRow("Roles", new Dictionary<string, object>
+            {
+                ["RoleID"] = roleId,
+                ["RoleName"] = roleName
+            });
+        }
+
+        private void SeedPlayer(int playerId, string nickname, string realName, string country, DateTime birthDate, string passwordHash = null, int roleId = 1)
         {
             SeedRow("Players", new Dictionary<string, object>
             {
@@ -891,7 +899,9 @@ namespace Tournaments.WPF.Services
                 ["Nickname"] = nickname,
                 ["RealName"] = realName,
                 ["Country"] = country,
-                ["BirthDate"] = birthDate
+                ["BirthDate"] = birthDate,
+                ["Password"] = passwordHash,
+                ["RoleID"] = roleId
             });
         }
 
@@ -936,17 +946,17 @@ namespace Tournaments.WPF.Services
             });
         }
 
-        private void SeedTeamPlayer(int teamPlayerId, int teamId, int playerId, string role, int joinedMonthsAgo)
+        private void SeedTeamPlayer(int teamPlayerId, int teamId, int playerId, DateTime joinDate, string role = null)
         {
             SeedRow("TeamPlayers", new Dictionary<string, object>
             {
                 ["TeamPlayerID"] = teamPlayerId,
                 ["TeamID"] = teamId,
                 ["PlayerID"] = playerId,
-                ["JoinDate"] = DateTime.Today.AddMonths(joinedMonthsAgo),
+                ["JoinDate"] = joinDate,
                 ["LeaveDate"] = DBNull.Value,
                 ["IsActive"] = true,
-                ["Role"] = role
+                ["Role"] = string.IsNullOrWhiteSpace(role) ? (object)DBNull.Value : role
             });
         }
 
@@ -1082,6 +1092,13 @@ namespace Tournaments.WPF.Services
             if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) && IsNull(row["RealName"]))
             {
                 row["RealName"] = "Скрыто";
+            }
+
+            if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) &&
+                row.Table.Columns.Contains("RoleID") &&
+                IsNull(row["RoleID"]))
+            {
+                row["RoleID"] = 1;
             }
 
             if (string.Equals(tableName, "Players", StringComparison.OrdinalIgnoreCase) &&

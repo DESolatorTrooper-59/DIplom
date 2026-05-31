@@ -4,6 +4,62 @@ namespace Tournaments.WPF.Services
 {
     public static partial class EntityRegistry
     {
+        private static EntityDefinition CreateRolesDefinition()
+        {
+            EntityDefinition definition = new EntityDefinition(
+                "Roles",
+                "Роли",
+                new[] { "RoleID" },
+                new[]
+                {
+                    new FieldDefinition("RoleID", "ID роли", FieldType.Integer) { IsIdentity = true, IsReadOnly = true, IsKey = true },
+                    new FieldDefinition("RoleName", "Название роли", FieldType.Text) { IsRequired = true }
+                });
+
+            definition.SaveValidator = context =>
+            {
+                string roleName = GetString(context.Values, "RoleName");
+                if (!IsSystemRoleName(roleName))
+                {
+                    return EntityValidationResult.Fail("Доступные роли: Игрок, Организатор, Администратор.");
+                }
+
+                int currentId = GetOriginalInt(context, "RoleID");
+                if (IsDuplicate(context.Database, "Roles", "RoleName", roleName, "RoleID", currentId, context.IsInsert))
+                {
+                    return EntityValidationResult.Fail("Роль с таким названием уже существует.");
+                }
+
+                return EntityValidationResult.Success();
+            };
+
+            definition.DeleteValidator = context =>
+            {
+                int roleId = GetOriginalInt(context, "RoleID");
+                if (roleId >= 1 && roleId <= 3)
+                {
+                    return EntityValidationResult.Fail("Базовые роли нельзя удалить.");
+                }
+
+                int players = Count(context.Database, "Players", row => ValuesEqual(row["RoleID"], roleId));
+                if (players > 0)
+                {
+                    return EntityValidationResult.Fail("Нельзя удалить роль, пока она назначена игрокам.");
+                }
+
+                return EntityValidationResult.Success();
+            };
+
+            return definition;
+        }
+
+        private static bool IsSystemRoleName(string roleName)
+        {
+            return string.Equals(roleName, "Игрок", System.StringComparison.CurrentCultureIgnoreCase) ||
+                   string.Equals(roleName, "Организатор", System.StringComparison.CurrentCultureIgnoreCase) ||
+                   string.Equals(roleName, "Администратор", System.StringComparison.CurrentCultureIgnoreCase);
+        }
+
         private static EntityDefinition CreateTeamsDefinition()
         {
             EntityDefinition definition = new EntityDefinition(
@@ -65,7 +121,8 @@ namespace Tournaments.WPF.Services
                     new FieldDefinition("Nickname", "Никнейм", FieldType.Text) { IsRequired = true },
                     new FieldDefinition("RealName", "Реальное имя", FieldType.Text) { IsRequired = true },
                     new FieldDefinition("Country", "Страна", FieldType.Text) { IsRequired = true },
-                    new FieldDefinition("BirthDate", "Дата рождения", FieldType.Date) { IsRequired = true }
+                    new FieldDefinition("BirthDate", "Дата рождения", FieldType.Date) { IsRequired = true },
+                    CreateLookupField("RoleID", "Роль", "Roles", "RoleID", "RoleName", isRequired: true)
                 });
 
             definition.SaveValidator = context =>
@@ -75,6 +132,12 @@ namespace Tournaments.WPF.Services
                 if (IsDuplicate(context.Database, "Players", "Nickname", nickname, "PlayerID", currentId, context.IsInsert))
                 {
                     return EntityValidationResult.Fail("Игрок с таким никнеймом уже существует.");
+                }
+
+                int roleId = GetInt(context.Values, "RoleID");
+                if (!context.Database.RecordExists("Roles", "RoleID", roleId))
+                {
+                    return EntityValidationResult.Fail("Роли с таким ID не существует.");
                 }
 
                 return EntityValidationResult.Success();

@@ -26,6 +26,11 @@ namespace Tournaments.WPF.Views
         private List<TournamentCardViewModel> _allCards = new List<TournamentCardViewModel>();
         private int? _currentPlayerId;
 
+        private bool CanRegisterAsPlayer
+        {
+            get { return _currentRole == UserRole.Player || _currentRole == UserRole.Organizer; }
+        }
+
         public TournamentCatalogPage(DatabaseService database, EntityCrudService crud, string currentLogin, UserRole currentRole)
         {
             InitializeComponent();
@@ -36,7 +41,7 @@ namespace Tournaments.WPF.Views
             _tournamentsDefinition = _database.GetEffectiveDefinition(EntityRegistry.All.First(definition => string.Equals(definition.TableName, "Tournaments", StringComparison.OrdinalIgnoreCase)));
             _participantsDefinition = _database.GetEffectiveDefinition(EntityRegistry.All.First(definition => string.Equals(definition.TableName, "TournamentParticipants", StringComparison.OrdinalIgnoreCase)));
 
-            CreateButton.Visibility = _currentRole == UserRole.Administrator ? Visibility.Visible : Visibility.Collapsed;
+            CreateButton.Visibility = AccessPolicy.CanCreateTournaments(_currentRole) ? Visibility.Visible : Visibility.Collapsed;
             SubtitleText.Text = BuildSubtitle();
             Loaded += TournamentCatalogPage_Loaded;
         }
@@ -141,9 +146,11 @@ namespace Tournaments.WPF.Views
                 PreviewImage = previewImage,
                 PreviewImageVisibility = previewImage == null ? Visibility.Collapsed : Visibility.Visible,
                 PreviewPlaceholderVisibility = previewImage == null ? Visibility.Visible : Visibility.Collapsed,
-                RegisterButtonVisibility = _currentRole == UserRole.Player ? Visibility.Visible : Visibility.Collapsed,
-                SettingsButtonVisibility = _currentRole == UserRole.Administrator ? Visibility.Visible : Visibility.Collapsed,
-                AdminManageParticipantsVisibility = _currentRole == UserRole.Administrator
+                RegisterButtonVisibility = CanRegisterAsPlayer ? Visibility.Visible : Visibility.Collapsed,
+                SettingsButtonVisibility = CanManageTournament(cardOrganizer: row.Table.Columns.Contains("Organizer") && row["Organizer"] != DBNull.Value ? Convert.ToString(row["Organizer"]) : null)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed,
+                AdminManageParticipantsVisibility = CanManageTournament(cardOrganizer: row.Table.Columns.Contains("Organizer") && row["Organizer"] != DBNull.Value ? Convert.ToString(row["Organizer"]) : null)
                     ? Visibility.Visible
                     : Visibility.Collapsed,
                 AdminManageParticipantsButtonText = string.Equals(participantMode, "Игроки", StringComparison.CurrentCultureIgnoreCase)
@@ -160,7 +167,7 @@ namespace Tournaments.WPF.Views
 
         private void ConfigureRegistrationState(TournamentCardViewModel card)
         {
-            if (_currentRole != UserRole.Player)
+            if (!CanRegisterAsPlayer)
             {
                 card.IsRegisterEnabled = false;
                 card.RegisterButtonText = "Зарегистрироваться";
@@ -207,7 +214,7 @@ namespace Tournaments.WPF.Views
 
         private void ConfigureAdminActions(TournamentCardViewModel card)
         {
-            if (_currentRole != UserRole.Administrator)
+            if (!CanManageTournament(card.Organizer))
             {
                 card.IsAdminManageParticipantsEnabled = false;
                 card.AdminManageParticipantsToolTip = string.Empty;
@@ -250,9 +257,14 @@ namespace Tournaments.WPF.Views
 
         private void CreateButton_Click(object sender, RoutedEventArgs e)
         {
+            if (!AccessPolicy.CanCreateTournaments(_currentRole))
+            {
+                return;
+            }
+
             try
             {
-                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, null, _database)
+                EditEntityWindow window = new EditEntityWindow(GetTournamentWindowDefinition(), null, _database)
                 {
                     Owner = Window.GetWindow(this)
                 };
@@ -318,6 +330,11 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
+            if (!CanManageTournament(card.Organizer))
+            {
+                return;
+            }
+
             TournamentParticipantPickerWindow window = new TournamentParticipantPickerWindow(_database, _participantsDefinition, card)
             {
                 Owner = Window.GetWindow(this)
@@ -373,16 +390,24 @@ namespace Tournaments.WPF.Views
 
             MenuItem deleteItem = new MenuItem { Header = "Удалить турнир" };
             deleteItem.Click += (sender, e) => DeleteTournament(card);
-            menu.Items.Add(deleteItem);
+            if (_currentRole == UserRole.Administrator)
+            {
+                menu.Items.Add(deleteItem);
+            }
 
             return menu;
         }
 
         private void EditTournament(TournamentCardViewModel card)
         {
+            if (card == null || !CanManageTournament(card.Organizer))
+            {
+                return;
+            }
+
             try
             {
-                EditEntityWindow window = new EditEntityWindow(_tournamentsDefinition, card.OriginalValues, _database)
+                EditEntityWindow window = new EditEntityWindow(GetTournamentWindowDefinition(), card.OriginalValues, _database)
                 {
                     Owner = Window.GetWindow(this)
                 };
@@ -407,6 +432,11 @@ namespace Tournaments.WPF.Views
 
         private void DeleteTournament(TournamentCardViewModel card)
         {
+            if (_currentRole != UserRole.Administrator)
+            {
+                return;
+            }
+
             try
             {
                 EntityEditContext context = new EntityEditContext(false, card.OriginalValues, card.OriginalValues, _database);
@@ -541,9 +571,9 @@ namespace Tournaments.WPF.Views
 
         private void RegisterCurrentPlayer(TournamentCardViewModel card)
         {
-            if (_currentRole != UserRole.Player)
+            if (!CanRegisterAsPlayer)
             {
-                throw new InvalidOperationException("Регистрация доступна только игрокам.");
+                throw new InvalidOperationException("Регистрация доступна только игрокам и организаторам.");
             }
 
             if (!_currentPlayerId.HasValue)
@@ -579,7 +609,7 @@ namespace Tournaments.WPF.Views
 
         private int? ResolveCurrentPlayerId()
         {
-            if (_currentRole != UserRole.Player || string.IsNullOrWhiteSpace(_currentLogin))
+            if (!CanRegisterAsPlayer || string.IsNullOrWhiteSpace(_currentLogin))
             {
                 return null;
             }
@@ -631,9 +661,16 @@ namespace Tournaments.WPF.Views
                 return;
             }
 
-            if ((!values.ContainsKey("Organizer") || values["Organizer"] == null || string.IsNullOrWhiteSpace(Convert.ToString(values["Organizer"]))) &&
-                !string.IsNullOrWhiteSpace(_currentLogin) &&
-                (isInsert || originalValues == null || !originalValues.ContainsKey("Organizer")))
+            if (isInsert && !string.IsNullOrWhiteSpace(_currentLogin))
+            {
+                values["Organizer"] = _currentLogin;
+            }
+            else if (_currentRole != UserRole.Administrator && originalValues != null && originalValues.ContainsKey("Organizer"))
+            {
+                values["Organizer"] = originalValues["Organizer"];
+            }
+            else if ((!values.ContainsKey("Organizer") || values["Organizer"] == null || string.IsNullOrWhiteSpace(Convert.ToString(values["Organizer"]))) &&
+                !string.IsNullOrWhiteSpace(_currentLogin))
             {
                 values["Organizer"] = _currentLogin;
             }
@@ -649,6 +686,57 @@ namespace Tournaments.WPF.Views
         private static TournamentCardViewModel GetCard(object sender)
         {
             return (sender as FrameworkElement)?.DataContext as TournamentCardViewModel;
+        }
+
+        private bool CanManageTournament(string cardOrganizer)
+        {
+            if (_currentRole == UserRole.Administrator)
+            {
+                return true;
+            }
+
+            return _currentRole == UserRole.Organizer &&
+                   !string.IsNullOrWhiteSpace(_currentLogin) &&
+                   !string.IsNullOrWhiteSpace(cardOrganizer) &&
+                   string.Equals(cardOrganizer, _currentLogin, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private EntityDefinition GetTournamentWindowDefinition()
+        {
+            if (_currentRole == UserRole.Administrator)
+            {
+                return _tournamentsDefinition;
+            }
+
+            List<FieldDefinition> fields = _tournamentsDefinition.Fields
+                .Select(field => CloneField(field, string.Equals(field.Name, "Organizer", StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            EntityDefinition definition = new EntityDefinition(_tournamentsDefinition.TableName, _tournamentsDefinition.Title, _tournamentsDefinition.KeyColumns, fields);
+            definition.SaveValidator = _tournamentsDefinition.SaveValidator;
+            definition.DeleteValidator = _tournamentsDefinition.DeleteValidator;
+            return definition;
+        }
+
+        private static FieldDefinition CloneField(FieldDefinition source, bool forceReadOnly)
+        {
+            FieldDefinition clone = new FieldDefinition(source.Name, source.Label, source.Type)
+            {
+                IsRequired = source.IsRequired,
+                IsIdentity = source.IsIdentity,
+                IsReadOnly = source.IsReadOnly || forceReadOnly,
+                IsKey = source.IsKey,
+                LookupTableName = source.LookupTableName,
+                LookupColumnName = source.LookupColumnName,
+                LookupDisplayColumnName = source.LookupDisplayColumnName
+            };
+
+            foreach (string value in source.AllowedValues)
+            {
+                clone.AllowedValues.Add(value);
+            }
+
+            return clone;
         }
 
         private static bool ConfirmCascadeDelete(string header, IEnumerable<string> dependencyLines, string question)
@@ -770,6 +858,8 @@ namespace Tournaments.WPF.Views
             {
                 case UserRole.Administrator:
                     return "Галерея турниров с карточками, подробностями, настройками и быстрым управлением превью.";
+                case UserRole.Organizer:
+                    return "Выбирайте турниры, регистрируйтесь и управляйте турнирами, где вы указаны организатором.";
                 case UserRole.Player:
                     return "Выбирайте турнир, смотрите детали и регистрируйтесь прямо с карточки.";
                 default:

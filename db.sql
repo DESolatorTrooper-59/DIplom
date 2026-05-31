@@ -67,11 +67,12 @@ GO
 
 -- Скрипт разворачивает dev/demo-базу данных для проекта.
 -- Физическая схема использует русские имена таблиц и столбцов.
--- Для совместимости со старым кодом ниже создаются английские VIEW-алиасы.
+-- Для совместимости с WPF-кодом ниже создаются английские VIEW-алиасы.
 -- Демо-учётная запись администратора: admin / password
+-- Демо-учётная запись организатора: organizer / organizer
 -- Пароли хранятся как SHA512-хеши в hex-формате.
 
-IF OBJECT_ID(N'[dbo].[Organizer]', N'V') IS NOT NULL DROP VIEW [dbo].[Organizer];
+IF OBJECT_ID(N'[dbo].[Roles]', N'V') IS NOT NULL DROP VIEW [dbo].[Roles];
 IF OBJECT_ID(N'[dbo].[GameTitles]', N'V') IS NOT NULL DROP VIEW [dbo].[GameTitles];
 IF OBJECT_ID(N'[dbo].[Teams]', N'V') IS NOT NULL DROP VIEW [dbo].[Teams];
 IF OBJECT_ID(N'[dbo].[Players]', N'V') IS NOT NULL DROP VIEW [dbo].[Players];
@@ -96,7 +97,7 @@ DROP TABLE IF EXISTS [dbo].[Sponsors];
 DROP TABLE IF EXISTS [dbo].[Players];
 DROP TABLE IF EXISTS [dbo].[Teams];
 DROP TABLE IF EXISTS [dbo].[GameTitles];
-DROP TABLE IF EXISTS [dbo].[Organizer];
+DROP TABLE IF EXISTS [dbo].[Roles];
 GO
 
 DROP TABLE IF EXISTS [dbo].[Трансляции];
@@ -110,14 +111,15 @@ DROP TABLE IF EXISTS [dbo].[Спонсоры];
 DROP TABLE IF EXISTS [dbo].[Игроки];
 DROP TABLE IF EXISTS [dbo].[Команды];
 DROP TABLE IF EXISTS [dbo].[Игры];
-DROP TABLE IF EXISTS [dbo].[Организаторы];
+DROP TABLE IF EXISTS [dbo].[Роли];
 GO
 
-CREATE TABLE [dbo].[Организаторы]
+CREATE TABLE [dbo].[Роли]
 (
-    [Логин] NVARCHAR(50) NOT NULL,
-    [Пароль] NVARCHAR(128) NOT NULL,
-    CONSTRAINT [PK_Organizer] PRIMARY KEY CLUSTERED ([Логин] ASC)
+    [IDРоли] INT IDENTITY(1,1) NOT NULL,
+    [НазваниеРоли] NVARCHAR(50) NOT NULL,
+    CONSTRAINT [PK_Roles] PRIMARY KEY CLUSTERED ([IDРоли] ASC),
+    CONSTRAINT [UQ_Roles_RoleName] UNIQUE ([НазваниеРоли])
 );
 GO
 
@@ -158,8 +160,12 @@ CREATE TABLE [dbo].[Игроки]
     [Страна] NVARCHAR(50) NOT NULL,
     [ДатаРождения] DATE NOT NULL,
     [Пароль] NVARCHAR(128) NULL,
+    [IDРоли] INT NOT NULL
+        CONSTRAINT [DF_Players_RoleID] DEFAULT (1),
     CONSTRAINT [PK_Players] PRIMARY KEY CLUSTERED ([IDИгрока] ASC),
-    CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Никнейм])
+    CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Никнейм]),
+    CONSTRAINT [FK_Players_Roles] FOREIGN KEY ([IDРоли])
+        REFERENCES [dbo].[Роли] ([IDРоли])
 );
 GO
 
@@ -357,10 +363,11 @@ CREATE TABLE [dbo].[СпонсорыТурниров]
 );
 GO
 
-INSERT INTO [dbo].[Организаторы] ([Логин], [Пароль])
+INSERT INTO [dbo].[Роли] ([НазваниеРоли])
 VALUES
-    (N'admin', N'b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb980b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86'),
-    (N'organizer', N'0541b939bc2922a386db6f662f98952b0ee01afc96a3956f2daa4d4bc9b9e254316088123021d522d7cc06dba8e68708cac13c111ef2dc6cc13b2cc184611e76');
+    (N'Игрок'),
+    (N'Организатор'),
+    (N'Администратор');
 
 INSERT INTO [dbo].[Игры] ([НазваниеИгры], [Разработчик], [ГодВыпуска], [МаксИгроковВКоманде])
 VALUES
@@ -378,33 +385,36 @@ VALUES
     (2, N'Zaneki team', '2015-12-05', N'Online', N'Zaneki', '2026-05-14T18:05:06'),
     (3, N'Bartjones team', '2026-04-28', N'Online', N'Bartjones', '2026-05-15T18:33:45'),
     (4, N'Bookuha team', '2026-04-27', N'Online', N'Bookuha', '2026-05-15T18:34:11'),
-    (5, N'DavidZD team', '2026-05-01', N'Online', N'DavidZD', '2026-05-15T18:34:35');
+    (5, N'DavidZD team', '2026-05-01', N'Online', N'DavidZD', '2026-05-15T18:34:35'),
+    (6, N'Neiroslop', '2026-05-16', N'Online', N'AI', '2026-05-16T21:16:23');
 
 SET IDENTITY_INSERT [dbo].[Команды] OFF;
 
 SET IDENTITY_INSERT [dbo].[Игроки] ON;
 
-INSERT INTO [dbo].[Игроки] ([IDИгрока], [Никнейм], [НастоящееИмя], [Страна], [ДатаРождения], [Пароль])
+INSERT INTO [dbo].[Игроки] ([IDИгрока], [Никнейм], [НастоящееИмя], [Страна], [ДатаРождения], [Пароль], [IDРоли])
 VALUES
-    (3, N'DESolatorTrooper', N'Sergey Kornev', N'Russia', '2005-06-21', NULL),
-    (4, N'Bookuha', N'Andrey', N'Ukraine', '2000-01-01', NULL),
-    (5, N'Bikerushownz', N'Скрыто', N'United Kingdom', '2000-01-01', NULL),
-    (6, N'Hulk', N'Ivan', N'Russia', '2000-01-01', NULL),
-    (7, N'Mah_Boi', N'Скрыто', N'Blocked', '2000-01-01', NULL),
-    (8, N'Lamas', N'Скрыто', N'USA', '2026-04-01', NULL),
-    (9, N'Rildcom', N'Скрыто', N'Australia', '2000-01-01', NULL),
-    (10, N'Svenson', N'Скрыто', N'Online', '2000-01-01', NULL),
-    (11, N'Redeemer', N'Dmitry', N'Russia', '2026-04-29', NULL),
-    (12, N'Lumos', N'Скрыто', N'Russia', '2026-01-13', NULL),
-    (13, N'FateZero', N'Скрыто', N'Pakistan', '2019-02-13', NULL),
-    (14, N'Player 1', N'Player', N'Online', '2026-04-29', NULL),
-    (15, N'UnderworldFox', N'Скрыто', N'South Africa', '2025-10-14', NULL),
-    (16, N'Aquatech', N'Скрыто', N'Unknown', '2025-11-13', NULL),
-    (17, N'Iluhan', N'Илья', N'Russia', '1970-03-01', NULL),
-    (18, N'YourHorse', N'Скрыто', N'Europe', '2011-02-01', NULL),
-    (19, N'MrNoSweat', N'Скрыто', N'Europe', '1981-03-18', NULL),
-    (20, N'GreeeeeeenAlert', N'Скрыто', N'Russia', '2003-05-30', NULL),
-    (21, N'Player 21', N'Скрыто', N'Unknown', '1970-01-01', NULL);
+    (1, N'admin', N'Администратор', N'Online', '1970-01-01', N'b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb980b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86', 3),
+    (2, N'organizer', N'Организатор', N'Online', '1970-01-01', N'0541b939bc2922a386db6f662f98952b0ee01afc96a3956f2daa4d4bc9b9e254316088123021d522d7cc06dba8e68708cac13c111ef2dc6cc13b2cc184611e76', 2),
+    (3, N'DESolatorTrooper', N'Sergey Kornev', N'Russia', '2005-06-21', NULL, 1),
+    (4, N'Bookuha', N'Andrey', N'Ukraine', '2000-01-01', NULL, 1),
+    (5, N'Bikerushownz', N'Скрыто', N'United Kingdom', '2000-01-01', NULL, 1),
+    (6, N'Hulk', N'Ivan', N'Russia', '2000-01-01', NULL, 1),
+    (7, N'Mah_Boi', N'Скрыто', N'Blocked', '2000-01-01', NULL, 1),
+    (8, N'Lamas', N'Скрыто', N'USA', '2026-04-01', NULL, 1),
+    (9, N'Rildcom', N'Скрыто', N'Australia', '2000-01-01', NULL, 1),
+    (10, N'Svenson', N'Скрыто', N'Online', '2000-01-01', NULL, 1),
+    (11, N'Redeemer', N'Dmitry', N'Russia', '2026-04-29', NULL, 1),
+    (12, N'Lumos', N'Скрыто', N'Russia', '2026-01-13', NULL, 1),
+    (13, N'FateZero', N'Скрыто', N'Pakistan', '2019-02-13', NULL, 1),
+    (14, N'Player 1', N'Player', N'Online', '2026-04-29', NULL, 1),
+    (15, N'UnderworldFox', N'Скрыто', N'South Africa', '2025-10-14', NULL, 1),
+    (16, N'Aquatech', N'Скрыто', N'Unknown', '2025-11-13', NULL, 1),
+    (17, N'Iluhan', N'Илья', N'Russia', '1970-03-01', NULL, 1),
+    (18, N'YourHorse', N'Скрыто', N'Europe', '2011-02-01', NULL, 1),
+    (19, N'MrNoSweat', N'Скрыто', N'Europe', '1981-03-18', NULL, 1),
+    (20, N'GreeeeeeenAlert', N'Скрыто', N'Russia', '2003-05-30', NULL, 1),
+    (21, N'Player 21', N'Скрыто', N'Unknown', '1970-01-01', NULL, 1);
 
 SET IDENTITY_INSERT [dbo].[Игроки] OFF;
 
@@ -413,6 +423,29 @@ VALUES
     (N'Red Bull', N'Energy Drinks'),
     (N'Intel', N'Hardware'),
     (N'Logitech G', N'Peripherals');
+
+SET IDENTITY_INSERT [dbo].[СоставыКоманд] ON;
+
+INSERT INTO [dbo].[СоставыКоманд] ([IDСоставаКоманды], [IDКоманды], [IDИгрока], [ДатаПрисоединения], [ДатаУхода], [Активен], [Роль])
+VALUES
+    (3, 3, 20, '2026-05-16', NULL, 1, NULL),
+    (4, 3, 13, '2026-05-16', NULL, 1, NULL),
+    (5, 3, 8, '2026-05-16', NULL, 1, NULL),
+    (6, 2, 19, '2026-05-16', NULL, 1, NULL),
+    (7, 2, 9, '2026-05-16', NULL, 1, NULL),
+    (8, 2, 3, '2026-05-16', NULL, 1, NULL),
+    (9, 2, 21, '2026-05-16', NULL, 1, NULL),
+    (10, 6, 16, '2026-05-16', NULL, 1, NULL),
+    (11, 6, 17, '2026-05-16', NULL, 1, NULL),
+    (12, 6, 6, '2026-05-16', NULL, 1, NULL),
+    (13, 6, 20, '2026-05-16', NULL, 1, NULL),
+    (14, 6, 7, '2026-05-16', NULL, 1, NULL),
+    (15, 6, 12, '2026-05-16', NULL, 1, NULL),
+    (16, 6, 8, '2026-05-16', NULL, 1, NULL),
+    (17, 6, 13, '2026-05-16', NULL, 1, NULL),
+    (18, 6, 3, '2026-05-16', NULL, 1, NULL);
+
+SET IDENTITY_INSERT [dbo].[СоставыКоманд] OFF;
 
 SET IDENTITY_INSERT [dbo].[Турниры] ON;
 
@@ -439,9 +472,9 @@ VALUES
     '2026-05-12',
     150000.00,
     N'admin',
-    N'Online',
+    N'Moscow',
     N'Double Elimination',
-    8,
+    10,
     N'Игроки'
 ),
 (
@@ -485,15 +518,15 @@ VALUES
 ),
 (
     5,
-    N'WEC Team Cup',
+    N'4v4 ZanekiPrivateTournament',
     3,
     '2026-02-05',
-    '2026-02-06',
-    0.00,
-    N'admin',
+    '2026-02-07',
+    100.00,
+    N'Zaneki',
     N'Online',
     N'Single Elimination',
-    8,
+    4,
     N'Команды'
 );
 
@@ -504,11 +537,6 @@ SET IDENTITY_INSERT [dbo].[ЭтапыТурниров] ON;
 INSERT INTO [dbo].[ЭтапыТурниров] ([IDЭтапа], [IDТурнира], [НазваниеЭтапа], [ПорядокЭтапа], [ТипСетки])
 VALUES
     (1, 1, N'Playoffs', 1, N'Winner'),
-    (2, 4, N'Bracket - Round of 32', 100, N'Winner'),
-    (3, 4, N'Bracket - Round of 16', 101, N'Winner'),
-    (4, 4, N'Bracket - Quarterfinals', 102, N'Winner'),
-    (5, 4, N'Bracket - Semifinals', 103, N'Winner'),
-    (6, 4, N'Bracket - Grand Final', 104, N'Final'),
     (7, 2, N'League - Round 1', 400, NULL),
     (8, 2, N'League - Round 2', 401, NULL),
     (9, 2, N'League - Round 3', 402, NULL),
@@ -542,7 +570,12 @@ VALUES
     (37, 1, N'Bracket - Lower - Round 2', 201, N'Loser'),
     (38, 1, N'Bracket - Lower - Round 3', 202, N'Loser'),
     (39, 1, N'Bracket - Lower - Final', 203, N'Loser'),
-    (40, 1, N'Bracket - Grand Final', 300, N'Final');
+    (40, 1, N'Bracket - Grand Final', 300, N'Final'),
+    (41, 4, N'Bracket - Round of 32', 100, N'Winner'),
+    (42, 4, N'Bracket - Round of 16', 101, N'Winner'),
+    (43, 4, N'Bracket - Quarterfinals', 102, N'Winner'),
+    (44, 4, N'Bracket - Semifinals', 103, N'Winner'),
+    (45, 4, N'Bracket - Grand Final', 104, N'Final');
 
 SET IDENTITY_INSERT [dbo].[ЭтапыТурниров] OFF;
 
@@ -642,12 +675,12 @@ VALUES
     (2, 3, 50000.00, N'USD');
 GO
 
-CREATE VIEW [dbo].[Organizer]
+CREATE VIEW [dbo].[Roles]
 AS
 SELECT
-    [Логин] AS [Login],
-    [Пароль] AS [Password]
-FROM [dbo].[Организаторы];
+    [IDРоли] AS [RoleID],
+    [НазваниеРоли] AS [RoleName]
+FROM [dbo].[Роли];
 GO
 
 CREATE VIEW [dbo].[GameTitles]
@@ -681,7 +714,8 @@ SELECT
     [НастоящееИмя] AS [RealName],
     [Страна] AS [Country],
     [ДатаРождения] AS [BirthDate],
-    [Пароль] AS [Password]
+    [Пароль] AS [Password],
+    [IDРоли] AS [RoleID]
 FROM [dbo].[Игроки];
 GO
 

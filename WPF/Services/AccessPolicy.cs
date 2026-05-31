@@ -25,6 +25,16 @@ namespace Tournaments.WPF.Services
             return role == UserRole.Administrator;
         }
 
+        public static bool CanCreateTournaments(UserRole role)
+        {
+            return role == UserRole.Administrator || role == UserRole.Organizer;
+        }
+
+        public static bool CanCreateTeams(UserRole role)
+        {
+            return role == UserRole.Administrator || role == UserRole.Organizer;
+        }
+
         public static bool CanManageBracket(UserRole role)
         {
             return role == UserRole.Administrator;
@@ -32,7 +42,7 @@ namespace Tournaments.WPF.Services
 
         public static bool CanAccessBracket(UserRole role)
         {
-            return role == UserRole.Administrator || role == UserRole.Player;
+            return role == UserRole.Administrator || role == UserRole.Organizer || role == UserRole.Player;
         }
 
         public static bool CanAccessEntity(UserRole role, string tableName)
@@ -46,6 +56,7 @@ namespace Tournaments.WPF.Services
             {
                 case UserRole.Administrator:
                     return true;
+                case UserRole.Organizer:
                 case UserRole.Player:
                     return PlayerTables.Contains(tableName);
                 case UserRole.Guest:
@@ -61,6 +72,8 @@ namespace Tournaments.WPF.Services
             {
                 case UserRole.Administrator:
                     return "Администратор";
+                case UserRole.Organizer:
+                    return "Организатор";
                 case UserRole.Player:
                     return "Игрок";
                 default:

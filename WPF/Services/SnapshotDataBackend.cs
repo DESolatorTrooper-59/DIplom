@@ -55,20 +55,6 @@ namespace Tournaments.WPF.Services
             return false;
         }
 
-        public bool ValidateOrganizerLogin(string login, string password)
-        {
-            return false;
-        }
-
-        public bool ValidatePlayerLogin(string login, string password)
-        {
-            return false;
-        }
-
-        public void EnsureOrganizerUser(string login, string password)
-        {
-        }
-
         public bool RecordExists(string tableName, string columnName, object value)
         {
             return GetRequiredTable(tableName)

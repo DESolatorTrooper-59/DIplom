@@ -866,6 +866,13 @@ namespace Tournaments.WPF.Views
             {
                 row["RealName"] = "Скрыто";
             }
+
+            if (string.Equals(_definition.TableName, "Players", StringComparison.OrdinalIgnoreCase) &&
+                _sourceTable.Columns.Contains("RoleID") &&
+                row["RoleID"] == DBNull.Value)
+            {
+                row["RoleID"] = 1;
+            }
         }
         private static bool IsRequiredValueMissing(FieldDefinition field, object value)
         {

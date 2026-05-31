@@ -40,9 +40,7 @@ namespace Tournaments.WPF.Services
         {
             using (SqlConnection connection = CreateOpenConnection())
             {
-                EnsurePasswordColumnCanStoreHash(connection, "Organizer");
                 EnsurePasswordColumnCanStoreHash(connection, "Players");
-                MigratePlainTextPasswords(connection, "Organizer", "Login");
                 MigratePlainTextPasswords(connection, "Players", "PlayerID");
             }
         }
@@ -74,21 +72,7 @@ namespace Tournaments.WPF.Services
 
         public bool ValidateLogin(string login, string password)
         {
-            return ValidateOrganizerLogin(login, password) || ValidatePlayerLogin(login, password);
-        }
-
-        public bool ValidateOrganizerLogin(string login, string password)
-        {
-            return ValidateStoredPassword("Organizer", "Login", login, password);
-        }
-
-        public bool ValidatePlayerLogin(string login, string password)
-        {
             return ValidateStoredPassword("Players", "Nickname", login, password);
-        }
-
-        public void EnsureOrganizerUser(string login, string password)
-        {
         }
 
         private bool ValidateStoredPassword(string tableName, string loginColumn, string login, string password)
