@@ -36,6 +36,17 @@ namespace Tournaments.WPF.Services
 
         public bool IsTestMode => false;
 
+        public void EnsurePasswordStorage()
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            {
+                EnsurePasswordColumnCanStoreHash(connection, "Organizer");
+                EnsurePasswordColumnCanStoreHash(connection, "Players");
+                MigratePlainTextPasswords(connection, "Organizer", "Login");
+                MigratePlainTextPasswords(connection, "Players", "PlayerID");
+            }
+        }
+
         public DataTable GetTable(string tableName)
         {
             using (SqlConnection connection = CreateOpenConnection())
@@ -68,30 +79,47 @@ namespace Tournaments.WPF.Services
 
         public bool ValidateOrganizerLogin(string login, string password)
         {
-            using (SqlConnection connection = CreateOpenConnection())
-            using (SqlCommand command = connection.CreateCommand())
-            {
-                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Organizer] WHERE [Login] = @Login AND [Password] = @Password";
-                AddParameter(command, "@Login", login);
-                AddParameter(command, "@Password", password);
-                return Convert.ToInt32(command.ExecuteScalar()) > 0;
-            }
+            return ValidateStoredPassword("Organizer", "Login", login, password);
         }
 
         public bool ValidatePlayerLogin(string login, string password)
         {
-            using (SqlConnection connection = CreateOpenConnection())
-            using (SqlCommand command = connection.CreateCommand())
-            {
-                command.CommandText = "SELECT COUNT(1) FROM [dbo].[Players] WHERE [Nickname] = @Login AND [Password] = @Password";
-                AddParameter(command, "@Login", login);
-                AddParameter(command, "@Password", password);
-                return Convert.ToInt32(command.ExecuteScalar()) > 0;
-            }
+            return ValidateStoredPassword("Players", "Nickname", login, password);
         }
 
         public void EnsureOrganizerUser(string login, string password)
         {
+        }
+
+        private bool ValidateStoredPassword(string tableName, string loginColumn, string login, string password)
+        {
+            using (SqlConnection connection = CreateOpenConnection())
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                string safeTable = EscapeIdentifier(tableName);
+                string safeLoginColumn = EscapeIdentifier(loginColumn);
+                command.CommandText = "SELECT TOP (1) [Password] FROM [dbo].[" + safeTable + "] WHERE [" + safeLoginColumn + "] = @Login";
+                AddParameter(command, "@Login", login);
+                object result = command.ExecuteScalar();
+                if (result == null || result == DBNull.Value)
+                {
+                    return false;
+                }
+
+                string storedPassword = Convert.ToString(result);
+                if (!PasswordHasher.VerifyPassword(password, storedPassword))
+                {
+                    return false;
+                }
+
+                if (!PasswordHasher.IsSha512Hash(storedPassword))
+                {
+                    EnsurePasswordColumnCanStoreHash(connection, tableName);
+                    UpdateStoredPasswordHash(connection, tableName, loginColumn, login, PasswordHasher.HashPassword(password));
+                }
+
+                return true;
+            }
         }
 
         public bool RecordExists(string tableName, string columnName, object value)
@@ -456,6 +484,107 @@ namespace Tournaments.WPF.Services
                 command.Transaction = transaction;
                 command.CommandText = sql;
                 configure?.Invoke(command);
+                command.ExecuteNonQuery();
+            }
+        }
+
+        private void EnsurePasswordColumnCanStoreHash(SqlConnection connection, string tableName)
+        {
+            PasswordColumnTarget target = ResolvePasswordColumn(connection, tableName);
+            if (target == null ||
+                target.Metadata.MaxLength == -1 ||
+                target.Metadata.MaxLength >= PasswordHasher.Sha512HexLength)
+            {
+                return;
+            }
+
+            string safeTable = EscapeIdentifier(target.TableName);
+            string safeColumn = EscapeIdentifier(target.ColumnName);
+            string nullability = target.Metadata.IsNullable ? "NULL" : "NOT NULL";
+            ExecuteNonQuery(
+                connection,
+                null,
+                "ALTER TABLE [dbo].[" + safeTable + "] ALTER COLUMN [" + safeColumn + "] NVARCHAR(" + PasswordHasher.Sha512HexLength + ") " + nullability,
+                null);
+        }
+
+        private PasswordColumnTarget ResolvePasswordColumn(SqlConnection connection, string tableName)
+        {
+            string physicalTable = SqlSchemaMap.GetPhysicalTableName(tableName);
+            string physicalColumn = SqlSchemaMap.GetPhysicalColumnName(tableName, "Password");
+            ColumnMetadata metadata = ReadColumnMetadata(connection, physicalTable, physicalColumn);
+            if (metadata != null)
+            {
+                return new PasswordColumnTarget(physicalTable, physicalColumn, metadata);
+            }
+
+            metadata = ReadColumnMetadata(connection, tableName, "Password");
+            return metadata == null ? null : new PasswordColumnTarget(tableName, "Password", metadata);
+        }
+
+        private ColumnMetadata ReadColumnMetadata(SqlConnection connection, string tableName, string columnName)
+        {
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = @"
+SELECT CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = N'dbo'
+  AND TABLE_NAME = @TableName
+  AND COLUMN_NAME = @ColumnName";
+                AddParameter(command, "@TableName", tableName);
+                AddParameter(command, "@ColumnName", columnName);
+
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    if (!reader.Read())
+                    {
+                        return null;
+                    }
+
+                    int maxLength = reader.IsDBNull(0) ? -1 : Convert.ToInt32(reader.GetValue(0));
+                    bool isNullable = string.Equals(Convert.ToString(reader.GetValue(1)), "YES", StringComparison.OrdinalIgnoreCase);
+                    return new ColumnMetadata(maxLength, isNullable);
+                }
+            }
+        }
+
+        private void MigratePlainTextPasswords(SqlConnection connection, string tableName, string keyColumn)
+        {
+            string safeTable = EscapeIdentifier(tableName);
+            string safeKeyColumn = EscapeIdentifier(keyColumn);
+            List<PasswordMigrationRow> rows = new List<PasswordMigrationRow>();
+
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT [" + safeKeyColumn + "], [Password] FROM [dbo].[" + safeTable + "] WHERE [Password] IS NOT NULL";
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        rows.Add(new PasswordMigrationRow(reader.GetValue(0), Convert.ToString(reader.GetValue(1))));
+                    }
+                }
+            }
+
+            foreach (PasswordMigrationRow row in rows)
+            {
+                if (!PasswordHasher.IsSha512Hash(row.Password))
+                {
+                    UpdateStoredPasswordHash(connection, tableName, keyColumn, row.Key, PasswordHasher.HashPassword(row.Password));
+                }
+            }
+        }
+
+        private void UpdateStoredPasswordHash(SqlConnection connection, string tableName, string keyColumn, object keyValue, string passwordHash)
+        {
+            string safeTable = EscapeIdentifier(tableName);
+            string safeKeyColumn = EscapeIdentifier(keyColumn);
+            using (SqlCommand command = connection.CreateCommand())
+            {
+                command.CommandText = "UPDATE [dbo].[" + safeTable + "] SET [Password] = @Password WHERE [" + safeKeyColumn + "] = @Key";
+                AddParameter(command, "@Password", passwordHash);
+                AddParameter(command, "@Key", keyValue);
                 command.ExecuteNonQuery();
             }
         }
@@ -1421,6 +1550,48 @@ WHERE S.[TournamentID] = @TournamentID
             if (left is bool || right is bool) return Convert.ToBoolean(left) == Convert.ToBoolean(right);
             if (left is decimal || right is decimal || left is double || right is double || left is float || right is float) return Convert.ToDecimal(left) == Convert.ToDecimal(right);
             return Convert.ToInt64(left) == Convert.ToInt64(right);
+        }
+
+        private sealed class ColumnMetadata
+        {
+            public ColumnMetadata(int maxLength, bool isNullable)
+            {
+                MaxLength = maxLength;
+                IsNullable = isNullable;
+            }
+
+            public int MaxLength { get; }
+
+            public bool IsNullable { get; }
+        }
+
+        private sealed class PasswordColumnTarget
+        {
+            public PasswordColumnTarget(string tableName, string columnName, ColumnMetadata metadata)
+            {
+                TableName = tableName;
+                ColumnName = columnName;
+                Metadata = metadata;
+            }
+
+            public string TableName { get; }
+
+            public string ColumnName { get; }
+
+            public ColumnMetadata Metadata { get; }
+        }
+
+        private sealed class PasswordMigrationRow
+        {
+            public PasswordMigrationRow(object key, string password)
+            {
+                Key = key;
+                Password = password;
+            }
+
+            public object Key { get; }
+
+            public string Password { get; }
         }
 
         private sealed class SqlBracketRoundState

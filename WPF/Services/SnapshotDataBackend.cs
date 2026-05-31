@@ -32,6 +32,10 @@ namespace Tournaments.WPF.Services
 
         public bool IsTestMode => false;
 
+        public void EnsurePasswordStorage()
+        {
+        }
+
         public DataTable GetTable(string tableName)
         {
             return GetRequiredTable(tableName).Copy();

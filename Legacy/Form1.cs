@@ -26,7 +26,9 @@ namespace Tournaments
             if (!string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(b))
             {
                 MainFunc.conBD.Open();
-                SqlCommand sc = new SqlCommand("Select count(*) From [Organizer] Where [login]='" + a + "' AND [Password]='" + b + "'", MainFunc.conBD);
+                SqlCommand sc = new SqlCommand("Select count(*) From [Organizer] Where [Login] = @Login AND [Password] = @Password", MainFunc.conBD);
+                sc.Parameters.Add("@Login", SqlDbType.NVarChar, 50).Value = a;
+                sc.Parameters.Add("@Password", SqlDbType.NVarChar, 128).Value = PasswordHasher.HashPassword(b);
                 c = sc.ExecuteScalar().ToString();
                 if (c == "1")
                 {

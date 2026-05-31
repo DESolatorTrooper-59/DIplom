@@ -102,7 +102,7 @@ namespace Tournaments.WPF.Services
                 ["RealName"] = normalizedRealName,
                 ["Country"] = UnspecifiedCountry,
                 ["BirthDate"] = birthDate.Date,
-                ["Password"] = normalizedPassword
+                ["Password"] = PasswordHasher.HashPassword(normalizedPassword)
             });
         }
 
@@ -267,6 +267,7 @@ namespace Tournaments.WPF.Services
                 return;
             }
 
+            _backend.EnsurePasswordStorage();
             ValidateRequiredColumns("Organizer", "Login", "Password");
             ValidateRequiredColumns("Players", "Password");
             foreach (EntityDefinition definition in EntityRegistry.All)
@@ -745,7 +746,7 @@ namespace Tournaments.WPF.Services
 
             string passwordToSave = string.IsNullOrWhiteSpace(newPassword)
                 ? Convert.ToString(row["Password"])
-                : newPassword;
+                : PasswordHasher.HashPassword(newPassword);
 
             Update("Players",
                 new[] { "PlayerID" },
@@ -782,7 +783,7 @@ namespace Tournaments.WPF.Services
                 new[] { "Login" },
                 new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["Password"] = newPassword
+                    ["Password"] = PasswordHasher.HashPassword(newPassword)
                 },
                 new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                 {

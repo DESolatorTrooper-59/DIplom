@@ -41,7 +41,7 @@ namespace Tournaments.WPF.Services
 
                 DataRow organizer = organizers.NewRow();
                 organizer["Login"] = login;
-                organizer["Password"] = password;
+                organizer["Password"] = PasswordHasher.HashPassword(password);
                 organizers.Rows.Add(organizer);
             }
         }
@@ -62,7 +62,7 @@ namespace Tournaments.WPF.Services
                         !IsNull(row["Login"]) &&
                         !IsNull(row["Password"]) &&
                         string.Equals(Convert.ToString(row["Login"]), login, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(Convert.ToString(row["Password"]), password, StringComparison.Ordinal));
+                        PasswordHasher.VerifyPassword(password, Convert.ToString(row["Password"])));
             }
         }
 
@@ -77,7 +77,7 @@ namespace Tournaments.WPF.Services
                         !IsNull(row["Nickname"]) &&
                         !IsNull(row["Password"]) &&
                         string.Equals(Convert.ToString(row["Nickname"]), login, StringComparison.OrdinalIgnoreCase) &&
-                        string.Equals(Convert.ToString(row["Password"]), password, StringComparison.Ordinal));
+                        PasswordHasher.VerifyPassword(password, Convert.ToString(row["Password"])));
             }
         }
 

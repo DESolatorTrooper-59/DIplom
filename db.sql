@@ -69,6 +69,7 @@ GO
 -- Физическая схема использует русские имена таблиц и столбцов.
 -- Для совместимости со старым кодом ниже создаются английские VIEW-алиасы.
 -- Демо-учётная запись администратора: admin / password
+-- Пароли хранятся как SHA512-хеши в hex-формате.
 
 IF OBJECT_ID(N'[dbo].[Organizer]', N'V') IS NOT NULL DROP VIEW [dbo].[Organizer];
 IF OBJECT_ID(N'[dbo].[GameTitles]', N'V') IS NOT NULL DROP VIEW [dbo].[GameTitles];
@@ -115,7 +116,7 @@ GO
 CREATE TABLE [dbo].[Организаторы]
 (
     [Логин] NVARCHAR(50) NOT NULL,
-    [Пароль] NVARCHAR(50) NOT NULL,
+    [Пароль] NVARCHAR(128) NOT NULL,
     CONSTRAINT [PK_Organizer] PRIMARY KEY CLUSTERED ([Логин] ASC)
 );
 GO
@@ -156,7 +157,7 @@ CREATE TABLE [dbo].[Игроки]
     [НастоящееИмя] NVARCHAR(150) NOT NULL,
     [Страна] NVARCHAR(50) NOT NULL,
     [ДатаРождения] DATE NOT NULL,
-    [Пароль] NVARCHAR(50) NULL,
+    [Пароль] NVARCHAR(128) NULL,
     CONSTRAINT [PK_Players] PRIMARY KEY CLUSTERED ([IDИгрока] ASC),
     CONSTRAINT [UQ_Players_Nickname] UNIQUE ([Никнейм])
 );
@@ -358,8 +359,8 @@ GO
 
 INSERT INTO [dbo].[Организаторы] ([Логин], [Пароль])
 VALUES
-    (N'admin', N'password'),
-    (N'organizer', N'organizer');
+    (N'admin', N'b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb980b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86'),
+    (N'organizer', N'0541b939bc2922a386db6f662f98952b0ee01afc96a3956f2daa4d4bc9b9e254316088123021d522d7cc06dba8e68708cac13c111ef2dc6cc13b2cc184611e76');
 
 INSERT INTO [dbo].[Игры] ([НазваниеИгры], [Разработчик], [ГодВыпуска], [МаксИгроковВКоманде])
 VALUES

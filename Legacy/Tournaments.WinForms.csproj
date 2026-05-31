@@ -59,6 +59,7 @@
       <DependentUpon>Games.cs</DependentUpon>
     </Compile>
     <Compile Include="MainFunc.cs" />
+    <Compile Include="PasswordHasher.cs" />
     <Compile Include="Matchs.cs">
       <SubType>Form</SubType>
     </Compile>

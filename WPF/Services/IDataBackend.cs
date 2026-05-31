@@ -13,6 +13,8 @@ namespace Tournaments.WPF.Services
 
         bool IsTestMode { get; }
 
+        void EnsurePasswordStorage();
+
         DataTable GetTable(string tableName);
 
         IReadOnlyCollection<string> GetColumns(string tableName);
