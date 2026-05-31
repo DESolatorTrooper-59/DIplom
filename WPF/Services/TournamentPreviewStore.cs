@@ -45,7 +45,18 @@ namespace Tournaments.WPF.Services
             new EmbeddedTournamentPreview(1, "Spring Brawl", "Assets/TournamentPreviews/tournament-1-KWTournament-TW-1.png"),
             new EmbeddedTournamentPreview(2, "World Champion Series 2v2", "Assets/TournamentPreviews/tournament-2-2v2.png"),
             new EmbeddedTournamentPreview(4, "World Champion Series 1v1", "Assets/TournamentPreviews/tournament-4-1v1.png"),
-            new EmbeddedTournamentPreview(5, "13 KW Preview", "Assets/TournamentPreviews/tournament-5-13-KW-Preview.webp")
+            new EmbeddedTournamentPreview(5, "13 KW Preview", "Assets/TournamentPreviews/tournament-5-13-KW-Preview.webp"),
+            new EmbeddedTournamentPreview(0, "Buggy", "Assets/TournamentPreviews/Buggy.png"),
+            new EmbeddedTournamentPreview(0, "Cyborg Green", "Assets/TournamentPreviews/CyborgGreen.png"),
+            new EmbeddedTournamentPreview(0, "Cyborg Purple", "Assets/TournamentPreviews/CyborgPurple.png"),
+            new EmbeddedTournamentPreview(0, "Desert MCV", "Assets/TournamentPreviews/DesertMCV.png"),
+            new EmbeddedTournamentPreview(0, "Helicopters In Ocean", "Assets/TournamentPreviews/HelicoptersInOcean.png"),
+            new EmbeddedTournamentPreview(0, "Mantis Tank", "Assets/TournamentPreviews/MantisTank.png"),
+            new EmbeddedTournamentPreview(0, "Orca Art", "Assets/TournamentPreviews/Orca-Art.png"),
+            new EmbeddedTournamentPreview(0, "Predator Tank", "Assets/TournamentPreviews/PredatorTank.png"),
+            new EmbeddedTournamentPreview(0, "Red Alert 3", "Assets/TournamentPreviews/RedAlert-3.jpg"),
+            new EmbeddedTournamentPreview(0, "ZOCOM SonicAir", "Assets/TournamentPreviews/ZOCOM-SonicAir.jpg"),
+            new EmbeddedTournamentPreview(0, "Zone Raider", "Assets/TournamentPreviews/ZoneRaider.png")
         };
 
         private readonly Dictionary<int, string> _previewPaths = new Dictionary<int, string>();
