@@ -294,9 +294,16 @@ namespace Tournaments.WPF.Views
                     ? field.LookupDisplayColumnName
                     : null;
 
-                List<LookupOption> options = lookupTable.Rows
+                IEnumerable<DataRow> rows = lookupTable.Rows
                     .Cast<DataRow>()
-                    .Where(row => row[field.LookupColumnName] != DBNull.Value)
+                    .Where(row => row[field.LookupColumnName] != DBNull.Value);
+
+                if (RoleRules.IsTournamentOrganizerField(field))
+                {
+                    rows = rows.Where(row => RoleRules.CanOrganizeTournament(_database, row));
+                }
+
+                List<LookupOption> options = rows
                     .OrderBy(row => Convert.ToString(row[field.LookupColumnName], CultureInfo.CurrentCulture))
                     .Select(row => new LookupOption(
                         row[field.LookupColumnName],

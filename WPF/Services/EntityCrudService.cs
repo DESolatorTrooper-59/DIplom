@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -7,6 +8,7 @@ namespace Tournaments.WPF.Services
 {
     public sealed class EntityCrudService
     {
+        private const string DefaultAdminCreatedPlayerPassword = "123";
         private readonly DatabaseService _database;
 
         public EntityCrudService(DatabaseService database)
@@ -24,6 +26,7 @@ namespace Tournaments.WPF.Services
             Dictionary<string, object> payload = GetWritableFields(definition)
                 .ToDictionary(field => field.Name, field => values.ContainsKey(field.Name) ? values[field.Name] : null);
 
+            ApplyInsertDefaults(definition, payload);
             _database.Insert(definition.TableName, payload);
         }
 
@@ -46,6 +49,22 @@ namespace Tournaments.WPF.Services
             return definition.Fields
                 .Where(field => !field.IsIdentity && !field.IsReadOnly)
                 .ToList();
+        }
+
+        private static void ApplyInsertDefaults(EntityDefinition definition, IDictionary<string, object> payload)
+        {
+            if (definition == null ||
+                !string.Equals(definition.TableName, "Players", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            if (!payload.ContainsKey("Password") ||
+                payload["Password"] == null ||
+                string.IsNullOrWhiteSpace(Convert.ToString(payload["Password"])))
+            {
+                payload["Password"] = PasswordHasher.HashPassword(DefaultAdminCreatedPlayerPassword);
+            }
         }
     }
 }

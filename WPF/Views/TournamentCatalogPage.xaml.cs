@@ -669,6 +669,13 @@ namespace Tournaments.WPF.Views
             {
                 values["Organizer"] = originalValues["Organizer"];
             }
+            else if (!isInsert &&
+                originalValues != null &&
+                originalValues.ContainsKey("Organizer") &&
+                (!values.ContainsKey("Organizer") || values["Organizer"] == null || string.IsNullOrWhiteSpace(Convert.ToString(values["Organizer"]))))
+            {
+                values["Organizer"] = originalValues["Organizer"];
+            }
             else if ((!values.ContainsKey("Organizer") || values["Organizer"] == null || string.IsNullOrWhiteSpace(Convert.ToString(values["Organizer"]))) &&
                 !string.IsNullOrWhiteSpace(_currentLogin))
             {

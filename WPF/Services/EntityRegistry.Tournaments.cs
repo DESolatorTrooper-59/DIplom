@@ -17,6 +17,13 @@ namespace Tournaments.WPF.Services
             formatType.AllowedValues.Add("Double Elimination");
             formatType.AllowedValues.Add("League");
 
+            FieldDefinition organizer = new FieldDefinition("Organizer", "Организатор", FieldType.Text)
+            {
+                LookupTableName = "Players",
+                LookupColumnName = "Nickname",
+                LookupDisplayColumnName = "RealName"
+            };
+
             EntityDefinition definition = new EntityDefinition(
                 "Tournaments",
                 "Турниры",
@@ -29,7 +36,7 @@ namespace Tournaments.WPF.Services
                     new FieldDefinition("StartDate", "Дата начала", FieldType.Date) { IsRequired = true },
                     new FieldDefinition("EndDate", "Дата окончания", FieldType.Date),
                     new FieldDefinition("PrizePool", "Призовой фонд", FieldType.Decimal),
-                    new FieldDefinition("Organizer", "Организатор", FieldType.Text),
+                    organizer,
                     new FieldDefinition("Location", "Место проведения", FieldType.Text),
                     formatType,
                     new FieldDefinition("MaxTeams", "Макс. участников", FieldType.Integer) { IsRequired = true },
@@ -61,6 +68,13 @@ namespace Tournaments.WPF.Services
                 if (!formatType.AllowedValues.Contains(formatValue))
                 {
                     return EntityValidationResult.Fail("Выберите один из поддерживаемых форматов турнира.");
+                }
+
+                string organizerValue = GetString(context.Values, "Organizer");
+                if (!string.IsNullOrWhiteSpace(organizerValue) &&
+                    !RoleRules.IsTournamentOrganizerLogin(context.Database, organizerValue))
+                {
+                    return EntityValidationResult.Fail("Организатором турнира может быть только игрок с ролью \"Организатор\" или \"Администратор\".");
                 }
 
                 return EntityValidationResult.Success();

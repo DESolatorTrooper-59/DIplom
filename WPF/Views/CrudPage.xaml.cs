@@ -1306,9 +1306,16 @@ namespace Tournaments.WPF.Views
                     ? field.LookupDisplayColumnName
                     : null;
 
-                List<LookupOption> options = lookupTable.Rows
+                IEnumerable<DataRow> rows = lookupTable.Rows
                     .Cast<DataRow>()
-                    .Where(row => row[field.LookupColumnName] != DBNull.Value)
+                    .Where(row => row[field.LookupColumnName] != DBNull.Value);
+
+                if (RoleRules.IsTournamentOrganizerField(field))
+                {
+                    rows = rows.Where(row => RoleRules.CanOrganizeTournament(_database, row));
+                }
+
+                List<LookupOption> options = rows
                     .OrderBy(row => Convert.ToString(row[field.LookupColumnName]))
                     .Select(row => new LookupOption(
                         row[field.LookupColumnName],
@@ -1432,9 +1439,20 @@ namespace Tournaments.WPF.Views
             return binding?.Path?.Path;
         }
 
-        private static bool IsExistingIdField(FieldDefinition field)
+        private bool IsExistingIdField(FieldDefinition field)
         {
-            return field.IsKey || field.Name.EndsWith("ID", StringComparison.OrdinalIgnoreCase);
+            if (field.IsKey)
+            {
+                return true;
+            }
+
+            if (string.Equals(_definition.TableName, "Players", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(field.Name, "RoleID", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return field.Name.EndsWith("ID", StringComparison.OrdinalIgnoreCase);
         }
 
         private static bool ValuesEqual(object left, object right)

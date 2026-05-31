@@ -5,6 +5,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>Tournaments.WPF</RootNamespace>
     <AssemblyName>Tournaments.WPF</AssemblyName>
+    <ApplicationIcon>Assets\TournamentsIcon.ico</ApplicationIcon>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
