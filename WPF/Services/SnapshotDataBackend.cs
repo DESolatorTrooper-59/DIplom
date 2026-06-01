@@ -76,7 +76,7 @@ namespace Tournaments.WPF.Services
             return null;
         }
 
-        public void Insert(string tableName, IDictionary<string, object> values)
+        public int? Insert(string tableName, IDictionary<string, object> values)
         {
             throw CreateUnsupportedException();
         }

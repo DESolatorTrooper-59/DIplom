@@ -81,7 +81,7 @@ namespace Tournaments.WPF.Views
 
             if (item.PageKey == "Bracket")
             {
-                PageHost.Content = new TournamentBracketPage(_database, _role);
+                PageHost.Content = new TournamentBracketPage(_database, _role, _currentLogin);
                 return;
             }
 

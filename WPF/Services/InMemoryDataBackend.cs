@@ -59,9 +59,9 @@ namespace Tournaments.WPF.Services
             return _store.PeekNextIdentityValue(tableName);
         }
 
-        public void Insert(string tableName, IDictionary<string, object> values)
+        public int? Insert(string tableName, IDictionary<string, object> values)
         {
-            _store.Insert(tableName, values);
+            return _store.Insert(tableName, values);
         }
 
         public void Update(string tableName, string[] keyColumns, IDictionary<string, object> values, IDictionary<string, object> originalValues)

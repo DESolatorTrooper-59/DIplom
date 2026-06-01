@@ -40,8 +40,11 @@ namespace Tournaments.WPF.Services
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Tournaments.WPF",
             StorageFileName);
+        private static readonly EmbeddedTournamentPreview DefaultEmbeddedPreview =
+            new EmbeddedTournamentPreview(0, "Нет фото", "Assets/TournamentPreviews/no-photo.png");
         private static readonly IReadOnlyList<EmbeddedTournamentPreview> EmbeddedPreviews = new[]
         {
+            DefaultEmbeddedPreview,
             new EmbeddedTournamentPreview(1, "Spring Brawl", "Assets/TournamentPreviews/tournament-1-KWTournament-TW-1.png"),
             new EmbeddedTournamentPreview(2, "World Champion Series 2v2", "Assets/TournamentPreviews/tournament-2-2v2.png"),
             new EmbeddedTournamentPreview(4, "World Champion Series 1v1", "Assets/TournamentPreviews/tournament-4-1v1.png"),
@@ -74,13 +77,18 @@ namespace Tournaments.WPF.Services
                 return path;
             }
 
-            EmbeddedTournamentPreview embeddedPreview = GetDefaultEmbeddedPreview(tournamentId);
-            return embeddedPreview?.StorageKey;
+            return DefaultEmbeddedPreview.StorageKey;
         }
 
         public void SetPreviewPath(int tournamentId, string path)
         {
             if (string.IsNullOrWhiteSpace(path))
+            {
+                RemovePreviewPath(tournamentId);
+                return;
+            }
+
+            if (IsDefaultPreviewPath(path))
             {
                 RemovePreviewPath(tournamentId);
                 return;
@@ -104,6 +112,16 @@ namespace Tournaments.WPF.Services
         public IReadOnlyList<EmbeddedTournamentPreview> GetEmbeddedPreviews()
         {
             return EmbeddedPreviews;
+        }
+
+        public bool HasStoredPreviewPath(int tournamentId)
+        {
+            return _previewPaths.ContainsKey(tournamentId);
+        }
+
+        public string GetDefaultPreviewPath()
+        {
+            return DefaultEmbeddedPreview.StorageKey;
         }
 
         public static Uri CreatePreviewUri(string previewPath)
@@ -142,6 +160,14 @@ namespace Tournaments.WPF.Services
             }
 
             return Path.GetFileName(previewPath);
+        }
+
+        public static bool IsDefaultPreviewPath(string path)
+        {
+            return string.Equals(
+                NormalizeEmbeddedPreviewPath(path),
+                DefaultEmbeddedPreview.StorageKey,
+                StringComparison.OrdinalIgnoreCase);
         }
 
         public void RemovePreviewPath(int tournamentId)
@@ -434,11 +460,6 @@ namespace Tournaments.WPF.Services
             {
                 return string.Equals(firstPath, secondPath, StringComparison.OrdinalIgnoreCase);
             }
-        }
-
-        private static EmbeddedTournamentPreview GetDefaultEmbeddedPreview(int tournamentId)
-        {
-            return EmbeddedPreviews.FirstOrDefault(preview => preview.TournamentId == tournamentId);
         }
 
         private static string NormalizeEmbeddedPreviewPath(string path)

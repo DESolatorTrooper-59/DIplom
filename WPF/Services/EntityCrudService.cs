@@ -21,13 +21,13 @@ namespace Tournaments.WPF.Services
             return _database.GetTable(definition.TableName);
         }
 
-        public void Insert(EntityDefinition definition, IDictionary<string, object> values)
+        public int? Insert(EntityDefinition definition, IDictionary<string, object> values)
         {
             Dictionary<string, object> payload = GetWritableFields(definition)
                 .ToDictionary(field => field.Name, field => values.ContainsKey(field.Name) ? values[field.Name] : null);
 
             ApplyInsertDefaults(definition, payload);
-            _database.Insert(definition.TableName, payload);
+            return _database.Insert(definition.TableName, payload);
         }
 
         public void Update(EntityDefinition definition, IDictionary<string, object> values, IDictionary<string, object> originalValues)

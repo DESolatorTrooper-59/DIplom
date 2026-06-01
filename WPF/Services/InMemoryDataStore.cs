@@ -96,18 +96,21 @@ namespace Tournaments.WPF.Services
             }
         }
 
-        public void Insert(string tableName, IDictionary<string, object> values)
+        public int? Insert(string tableName, IDictionary<string, object> values)
         {
             lock (_syncRoot)
             {
                 DataTable table = GetRequiredTable(tableName);
                 DataRow row = table.NewRow();
+                int? createdIdentity = null;
 
                 foreach (DataColumn column in table.Columns)
                 {
                     if (_identityColumns.TryGetValue(tableName, out string identityColumn) && string.Equals(identityColumn, column.ColumnName, StringComparison.OrdinalIgnoreCase))
                     {
-                        row[column.ColumnName] = _nextIdentities[tableName]++;
+                        int identityValue = _nextIdentities[tableName]++;
+                        row[column.ColumnName] = identityValue;
+                        createdIdentity = identityValue;
                         continue;
                     }
 
@@ -117,6 +120,7 @@ namespace Tournaments.WPF.Services
 
                 ApplyDefaults(tableName, row);
                 table.Rows.Add(row);
+                return createdIdentity;
             }
         }
 

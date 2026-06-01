@@ -31,11 +31,12 @@ namespace Tournaments.WPF.Views
             new StatusOption("Completed", "Завершен")
         };
 
-        private static readonly List<int> BestOfOptions = new List<int> { 1, 3, 5, 7 };
+        private static readonly List<int> BestOfOptions = new List<int> { 1, 3, 5, 7, 9 };
 
         private readonly DatabaseService _database;
         private readonly TournamentBracketService _bracketService;
         private readonly UserRole _currentRole;
+        private readonly string _currentLogin;
         private bool _isLoaded;
         private int _currentRoundCount;
         private TournamentBracketSnapshot _currentSnapshot;
@@ -43,12 +44,13 @@ namespace Tournaments.WPF.Views
         private List<BracketTeamOption> _teamOptions = new List<BracketTeamOption>();
         private bool _isUpdatingEditor;
 
-        public TournamentBracketPage(DatabaseService database, UserRole currentRole)
+        public TournamentBracketPage(DatabaseService database, UserRole currentRole, string currentLogin)
         {
             InitializeComponent();
             _database = database;
             _bracketService = new TournamentBracketService(database);
             _currentRole = currentRole;
+            _currentLogin = currentLogin;
             Loaded += TournamentBracketPage_Loaded;
 
             StatusComboBox.ItemsSource = StatusOptions;
@@ -274,6 +276,7 @@ namespace Tournaments.WPF.Views
 
             if (tournaments.Count == 0)
             {
+                ApplyRoleAccess();
                 SummaryText.Text = "Нет доступных турниров для построения сетки.";
                 ParticipantsList.ItemsSource = null;
                 BracketCanvas.Children.Clear();
@@ -309,6 +312,7 @@ namespace Tournaments.WPF.Views
             TournamentBracketSnapshot snapshot = _bracketService.BuildPreview(tournamentId.Value);
             _currentSnapshot = snapshot;
             _selectedMatch = ResolveSelectedMatch(snapshot, preferredMatchId);
+            ApplyRoleAccess();
 
             ParticipantsList.ItemsSource = snapshot.Participants;
             SummaryText.Text = BuildSummary(snapshot);
@@ -608,7 +612,7 @@ namespace Tournaments.WPF.Views
         {
             if (!CanManageBracket())
             {
-                ClearEditor("Доступен режим просмотра. Создание сетки, управление участниками и редактирование матчей доступны только администратору.");
+                ClearEditor("Доступен режим просмотра. Создание сетки и редактирование матчей доступны администратору или организатору выбранного турнира.");
                 return;
             }
 
@@ -810,7 +814,7 @@ namespace Tournaments.WPF.Views
                     ? (isLeague
                         ? "Пока показан предпросмотр расписания. Нажмите «Создать сетку», чтобы сохранить матчи и включить редактирование."
                         : "Пока показан предпросмотр сетки. Нажмите «Создать сетку», чтобы сохранить ее и включить редактирование.")
-                    : "Пока показан предпросмотр сетки. Создание и редактирование доступны только администратору.");
+                    : "Пока показан предпросмотр сетки. Создание и редактирование доступны администратору или организатору выбранного турнира.");
 
             if (isLeague)
             {
@@ -822,7 +826,8 @@ namespace Tournaments.WPF.Views
 
         private bool CanManageBracket()
         {
-            return AccessPolicy.CanManageBracket(_currentRole);
+            TournamentOption selectedTournament = TournamentComboBox == null ? null : TournamentComboBox.SelectedItem as TournamentOption;
+            return AccessPolicy.CanManageBracket(_currentRole, _currentLogin, selectedTournament == null ? null : selectedTournament.Organizer);
         }
 
         private void ApplyRoleAccess()
@@ -833,7 +838,7 @@ namespace Tournaments.WPF.Views
                 : "Просмотр сетки по раундам и состава участников выбранного турнира.";
             EditorTitleText.Text = canManageBracket ? "Редактирование матча" : "Режим просмотра";
             GenerateButton.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
-            OpenParticipantsButton.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
+            OpenParticipantsButton.Visibility = AccessPolicy.CanAccessEntity(_currentRole, "TournamentParticipants") ? Visibility.Visible : Visibility.Collapsed;
             EditorFieldsGrid.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
             TeamEditHintText.Visibility = canManageBracket ? Visibility.Visible : Visibility.Collapsed;
         }

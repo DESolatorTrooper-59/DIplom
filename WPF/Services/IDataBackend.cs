@@ -27,7 +27,7 @@ namespace Tournaments.WPF.Services
 
         int? PeekNextIdentityValue(string tableName);
 
-        void Insert(string tableName, IDictionary<string, object> values);
+        int? Insert(string tableName, IDictionary<string, object> values);
 
         void Update(string tableName, string[] keyColumns, IDictionary<string, object> values, IDictionary<string, object> originalValues);
 

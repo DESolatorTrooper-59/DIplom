@@ -278,7 +278,19 @@ namespace Tournaments.WPF.Views
                 ApplyTournamentDefaults(values, null, true);
                 ValidateTournamentSave(values, null, true);
 
-                _crud.Insert(_tournamentsDefinition, values);
+                TournamentPreviewPickerWindow previewWindow = new TournamentPreviewPickerWindow(_previewStore, _previewStore.GetDefaultPreviewPath())
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                if (previewWindow.ShowDialog() != true)
+                {
+                    return;
+                }
+
+                int? expectedTournamentId = _database.PeekNextIdentityValue("Tournaments");
+                int? createdTournamentId = ResolveCreatedTournamentId(_crud.Insert(_tournamentsDefinition, values), expectedTournamentId);
+                TrySaveCreatedTournamentPreview(createdTournamentId, previewWindow.SelectedPreviewPath);
                 LoadCards();
             }
             catch (Exception ex)
@@ -394,7 +406,7 @@ namespace Tournaments.WPF.Views
             menu.Items.Add(choosePreviewItem);
 
             MenuItem clearPreviewItem = new MenuItem { Header = "Сбросить превью" };
-            clearPreviewItem.IsEnabled = !string.IsNullOrWhiteSpace(card.PreviewPath);
+            clearPreviewItem.IsEnabled = _previewStore.HasStoredPreviewPath(card.TournamentId);
             clearPreviewItem.Click += (sender, e) => ClearPreview(card);
             menu.Items.Add(clearPreviewItem);
 
@@ -721,6 +733,60 @@ namespace Tournaments.WPF.Views
                 values["ParticipantMode"] = originalValues != null && originalValues.ContainsKey("ParticipantMode") && originalValues["ParticipantMode"] != null
                     ? originalValues["ParticipantMode"]
                     : "Команды";
+            }
+        }
+
+        private int? ResolveCreatedTournamentId(int? insertedTournamentId, int? expectedTournamentId)
+        {
+            if (insertedTournamentId.HasValue && insertedTournamentId.Value > 0)
+            {
+                return insertedTournamentId.Value;
+            }
+
+            if (expectedTournamentId.HasValue && expectedTournamentId.Value > 0)
+            {
+                return expectedTournamentId.Value;
+            }
+
+            return ResolveLatestTournamentId();
+        }
+
+        private int? ResolveLatestTournamentId()
+        {
+            DataTable tournaments = _database.GetTable("Tournaments");
+            if (!tournaments.Columns.Contains("TournamentID"))
+            {
+                return null;
+            }
+
+            List<int> tournamentIds = tournaments.Rows
+                .Cast<DataRow>()
+                .Where(row => row["TournamentID"] != DBNull.Value)
+                .Select(row => Convert.ToInt32(row["TournamentID"]))
+                .ToList();
+
+            return tournamentIds.Count == 0 ? (int?)null : tournamentIds.Max();
+        }
+
+        private void TrySaveCreatedTournamentPreview(int? tournamentId, string previewPath)
+        {
+            if (!tournamentId.HasValue || tournamentId.Value <= 0)
+            {
+                if (!TournamentPreviewStore.IsDefaultPreviewPath(previewPath))
+                {
+                    MessageBox.Show("Турнир создан, но не удалось определить его ID для сохранения превью.", "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+
+                return;
+            }
+
+            try
+            {
+                _previewStore.SetPreviewPath(tournamentId.Value, previewPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Турнир создан, но превью не удалось сохранить: " + ex.Message, "Tournaments WPF", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
 

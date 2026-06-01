@@ -30,6 +30,9 @@ namespace Tournaments.WPF.Services
                 {
                     TournamentId = Convert.ToInt32(row["TournamentID"]),
                     TournamentName = Convert.ToString(row["TournamentName"]),
+                    Organizer = row.Table.Columns.Contains("Organizer") && row["Organizer"] != DBNull.Value
+                        ? Convert.ToString(row["Organizer"])
+                        : null,
                     StartDate = Convert.ToDateTime(row["StartDate"])
                 })
                 .ToList();
@@ -295,7 +298,7 @@ namespace Tournaments.WPF.Services
             targetMatch.Team2Score = request.Team2Score;
             targetMatch.BestOf = request.BestOf;
             targetMatch.MatchDate = request.MatchDate.Date;
-            targetMatch.Status = NormalizeStatusValue(request.Status);
+            targetMatch.Status = NormalizeStatusValue(request.Status, request.BestOf, request.Team1Score, request.Team2Score);
             targetMatch.WinnerId = NormalizeWinnerId(request.WinnerTeamId, participant1Id, participant2Id, targetMatch.Status, request.Team1Score, request.Team2Score);
 
             ApplyPlanPropagation(plan, statesByKey, true);
@@ -337,7 +340,13 @@ namespace Tournaments.WPF.Services
                         Team2Score = persistedRow == null ? 0 : ReadInt(persistedRow["Team2Score"], 0),
                         BestOf = persistedRow == null ? matchPlan.BestOf : ReadInt(persistedRow["BestOf"], matchPlan.BestOf),
                         MatchDate = persistedRow == null ? tournamentStartDate.AddDays(matchPlan.DayOffset) : ParseDate(persistedRow["MatchDate"]),
-                        Status = persistedRow == null ? "Scheduled" : NormalizeStatusValue(Convert.ToString(persistedRow["Status"]))
+                        Status = persistedRow == null
+                            ? "Scheduled"
+                            : NormalizeStatusValue(
+                                Convert.ToString(persistedRow["Status"]),
+                                ReadInt(persistedRow["BestOf"], matchPlan.BestOf),
+                                ReadInt(persistedRow["Team1Score"], 0),
+                                ReadInt(persistedRow["Team2Score"], 0))
                     };
                 }
             }
@@ -833,7 +842,7 @@ namespace Tournaments.WPF.Services
                 ["Team2Score"] = team2Score,
                 ["MatchDate"] = matchDate.HasValue ? matchDate.Value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture) : null,
                 ["BestOf"] = bestOf,
-                ["Status"] = NormalizeStatusValue(status)
+                ["Status"] = NormalizeStatusValue(status, bestOf, team1Score, team2Score)
             };
 
             if (usePlayerColumns)
@@ -894,6 +903,11 @@ namespace Tournaments.WPF.Services
                 return null;
             }
 
+            if (!CanResolveOutcome(state.Status))
+            {
+                return null;
+            }
+
             if (state.WinnerId.HasValue && (state.WinnerId == state.Team1Id || state.WinnerId == state.Team2Id))
             {
                 return state.WinnerId;
@@ -937,6 +951,11 @@ namespace Tournaments.WPF.Services
 
         private static int? NormalizeWinnerId(int? winnerId, int? participant1Id, int? participant2Id, string status, int team1Score, int team2Score)
         {
+            if (!CanResolveOutcome(status))
+            {
+                return null;
+            }
+
             if (winnerId.HasValue)
             {
                 if (winnerId != participant1Id && winnerId != participant2Id)
@@ -1162,6 +1181,14 @@ namespace Tournaments.WPF.Services
             }
         }
 
+        private static bool CanResolveOutcome(string status)
+        {
+            string value = (status ?? string.Empty).Trim();
+            return string.Equals(value, "Completed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "Auto Advanced", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "AutoAdvanced", StringComparison.OrdinalIgnoreCase);
+        }
+
         private static string NormalizeStatusValue(string status)
         {
             string value = (status ?? string.Empty).Trim();
@@ -1175,6 +1202,24 @@ namespace Tournaments.WPF.Services
                 default:
                     return "Scheduled";
             }
+        }
+
+        private static string NormalizeStatusValue(string status, int bestOf, int team1Score, int team2Score)
+        {
+            return HasEnoughWinsForMatch(bestOf, team1Score, team2Score)
+                ? "Completed"
+                : NormalizeStatusValue(status);
+        }
+
+        private static bool HasEnoughWinsForMatch(int bestOf, int team1Score, int team2Score)
+        {
+            if (bestOf <= 0)
+            {
+                return false;
+            }
+
+            int requiredWins = bestOf / 2 + 1;
+            return team1Score >= requiredWins || team2Score >= requiredWins;
         }
 
         private static bool IsGeneratedStage(DataRow row)

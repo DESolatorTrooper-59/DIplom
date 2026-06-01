@@ -40,6 +40,19 @@ namespace Tournaments.WPF.Services
             return role == UserRole.Administrator;
         }
 
+        public static bool CanManageBracket(UserRole role, string currentLogin, string tournamentOrganizer)
+        {
+            if (CanManageBracket(role))
+            {
+                return true;
+            }
+
+            return role == UserRole.Organizer &&
+                   !string.IsNullOrWhiteSpace(currentLogin) &&
+                   !string.IsNullOrWhiteSpace(tournamentOrganizer) &&
+                   string.Equals(currentLogin, tournamentOrganizer, StringComparison.OrdinalIgnoreCase);
+        }
+
         public static bool CanAccessBracket(UserRole role)
         {
             return role == UserRole.Administrator || role == UserRole.Organizer || role == UserRole.Player;

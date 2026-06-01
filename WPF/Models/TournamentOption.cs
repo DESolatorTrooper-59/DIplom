@@ -8,6 +8,8 @@ namespace Tournaments.WPF.Models
 
         public string TournamentName { get; set; }
 
+        public string Organizer { get; set; }
+
         public DateTime StartDate { get; set; }
 
         public string DisplayName

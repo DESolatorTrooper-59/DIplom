@@ -141,11 +141,13 @@ namespace Tournaments.WPF.Services
             }
         }
 
-        public void Insert(string tableName, IDictionary<string, object> values)
+        public int? Insert(string tableName, IDictionary<string, object> values)
         {
             using (SqlConnection connection = CreateOpenConnection())
             {
-                InsertRow(connection, null, tableName, values, false, false);
+                bool returnIdentity = GetIdentityColumn(tableName, connection, null) != null;
+                int identityValue = InsertRow(connection, null, tableName, values, false, returnIdentity);
+                return returnIdentity ? (int?)identityValue : null;
             }
         }
 
@@ -322,7 +324,6 @@ namespace Tournaments.WPF.Services
                     {
                         int? participant1Id = roundIndex == 0 ? slots[matchIndex * 2] : (int?)null;
                         int? participant2Id = roundIndex == 0 ? slots[matchIndex * 2 + 1] : (int?)null;
-                        int? autoWinnerId = ResolveAutoAdvanceParticipantId(participant1Id, participant2Id);
                         Dictionary<string, object> matchValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
                         {
                             ["TournamentID"] = tournamentId,
@@ -330,10 +331,10 @@ namespace Tournaments.WPF.Services
                             ["MatchNumber"] = matchNumber++,
                             ["Team1ID"] = isPlayerMode ? null : (object)participant1Id,
                             ["Team2ID"] = isPlayerMode ? null : (object)participant2Id,
-                            ["WinnerTeamID"] = isPlayerMode ? null : (object)autoWinnerId,
+                            ["WinnerTeamID"] = null,
                             [Player1IdColumn] = isPlayerMode ? (object)participant1Id : null,
                             [Player2IdColumn] = isPlayerMode ? (object)participant2Id : null,
-                            [WinnerPlayerIdColumn] = isPlayerMode ? (object)autoWinnerId : null,
+                            [WinnerPlayerIdColumn] = null,
                             ["Team1Score"] = 0,
                             ["Team2Score"] = 0,
                             ["MatchDate"] = tournamentStartDate.AddDays(roundIndex),
@@ -413,7 +414,7 @@ namespace Tournaments.WPF.Services
                     throw new InvalidOperationException("Укажите корректную дату матча.");
                 }
 
-                string status = string.IsNullOrWhiteSpace(request.Status) ? "Scheduled" : request.Status.Trim();
+                string status = NormalizeStatusValue(request.Status, request.BestOf, request.Team1Score, request.Team2Score);
                 SetParticipantId(match, targetRound.IsPlayerMode, 1, team1Id);
                 SetParticipantId(match, targetRound.IsPlayerMode, 2, team2Id);
                 match["Team1Score"] = request.Team1Score;
@@ -784,7 +785,8 @@ WHERE s.name = 'dbo' AND t.name = @TableName AND c.is_identity = 1";
                 if (returnIdentity)
                 {
                     command.CommandText += "; SELECT CAST(SCOPE_IDENTITY() AS INT);";
-                    return Convert.ToInt32(command.ExecuteScalar());
+                    object result = command.ExecuteScalar();
+                    return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
                 }
 
                 command.ExecuteNonQuery();
@@ -1174,6 +1176,12 @@ WHERE S.[TournamentID] = @TournamentID
         {
             int? team1Id = GetParticipantId(sourceMatch, isPlayerMode, 1);
             int? team2Id = GetParticipantId(sourceMatch, isPlayerMode, 2);
+            string status = Convert.ToString(sourceMatch["Status"]);
+            if (!CanResolveOutcome(status))
+            {
+                return null;
+            }
+
             int? winnerTeamId = GetParticipantId(sourceMatch, isPlayerMode, 3);
             if (winnerTeamId.HasValue && (winnerTeamId == team1Id || winnerTeamId == team2Id))
             {
@@ -1190,7 +1198,6 @@ WHERE S.[TournamentID] = @TournamentID
                 return team2Id;
             }
 
-            string status = Convert.ToString(sourceMatch["Status"]);
             int team1Score = ReadInt(sourceMatch["Team1Score"], 0);
             int team2Score = ReadInt(sourceMatch["Team2Score"], 0);
             if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase) && team1Id.HasValue && team2Id.HasValue && team1Score != team2Score)
@@ -1224,6 +1231,11 @@ WHERE S.[TournamentID] = @TournamentID
 
         private static int? NormalizeWinnerTeamId(int? winnerTeamId, int? team1Id, int? team2Id, string status, int team1Score, int team2Score)
         {
+            if (!CanResolveOutcome(status))
+            {
+                return null;
+            }
+
             if (winnerTeamId.HasValue)
             {
                 if (winnerTeamId != team1Id && winnerTeamId != team2Id)
@@ -1252,19 +1264,45 @@ WHERE S.[TournamentID] = @TournamentID
             return null;
         }
 
-        private static int? ResolveAutoAdvanceParticipantId(int? team1Id, int? team2Id)
+        private static bool CanResolveOutcome(string status)
         {
-            if (team1Id.HasValue && !team2Id.HasValue)
+            string value = (status ?? string.Empty).Trim();
+            return string.Equals(value, "Completed", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "Auto Advanced", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(value, "AutoAdvanced", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string NormalizeStatusValue(string status, int bestOf, int team1Score, int team2Score)
+        {
+            if (HasEnoughWinsForMatch(bestOf, team1Score, team2Score))
             {
-                return team1Id;
+                return "Completed";
             }
 
-            if (team2Id.HasValue && !team1Id.HasValue)
+            string value = (status ?? string.Empty).Trim();
+            if (string.Equals(value, "Completed", StringComparison.OrdinalIgnoreCase))
             {
-                return team2Id;
+                return "Completed";
             }
 
-            return null;
+            if (string.Equals(value, "Auto Advanced", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "AutoAdvanced", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Auto Advanced";
+            }
+
+            return "Scheduled";
+        }
+
+        private static bool HasEnoughWinsForMatch(int bestOf, int team1Score, int team2Score)
+        {
+            if (bestOf <= 0)
+            {
+                return false;
+            }
+
+            int requiredWins = bestOf / 2 + 1;
+            return team1Score >= requiredWins || team2Score >= requiredWins;
         }
 
         private static int? GetParticipantId(DataRow row, bool isPlayerMode, int slotIndex)
